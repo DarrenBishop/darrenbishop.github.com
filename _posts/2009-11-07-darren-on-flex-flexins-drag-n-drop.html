@@ -1,0 +1,31 @@
+---
+layout: post
+title: 'Darren on Flex: Flexins, Drag ''n'' Drop Mixin now without sticky cursor and
+  with selectable text'
+date: '2009-11-07T14:39:00.003Z'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- Google
+- Flexmojos
+- Git
+- Maven
+modified_time: '2011-04-05T00:05:39.676+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-2423415475082593751
+blogger_orig_url: http://blog.darrenbishop.com/2009/11/darren-on-flex-flexins-drag-n-drop.html
+---
+
+<h4>Recap of Version 0.3</h4>If you quickly go back and play with the demo in my <a href="http://workingwithmrb.blogspot.com/2009/03/darren-on-flex-flexins-drag-n-drop.html">previous blog</a> you'll find that if you drag across the  TitleWindow i.e. pressing down the mouse button on the background (red canvas), the TitleWindow will stick to the cursor and drag along... not ideal.
+<p>Also, while it's not obvious in the previous demo application, clicking buttons, sliding scrollbar thumbs or selecting text in a component that is drag-enabled (by the mixin) will be interpreted as a drag gesture, thus preventing you from doing any of the above. Again, not ideal.</p>
+
+<h4>Not to worry, all is fixed</h4>With version 0.3.2 none of that dodgy behaviour exists anymore and drag-enabled components behave as expected:
+
+<embed src="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin/dnd-mixin-demo-0.3.2.swf?attredirects=0" quality="high" bgcolor="#869ca7" width="100%" height="400" name="Main" align="middle" play="true" loop="false" quality="high" allowScriptAccess="sameDomain" type="application/x-shockwave-flash" pluginspage="http://www.adobe.com/go/getflashplayer">
+</embed>
+
+The fixes are truly implementation details, but if you are really interested you can review the commits or each bug <a href="http://github.com/DarrenBishop/flexinsproject/commit/7349e3816856d085e81703b086a4ef5aa21297f1" rel="nofollow" target="_blank">here</a> and <a href="http://github.com/DarrenBishop/flexinsproject/commit/0a71c596695094136f479be8368992b466272dd2" rel="nofollow" target="_blank">here</a> at GitHub.
+
+That's it really. Visit the DnDMixin's <a href="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin">homepage</a> for more details and references to source code.
+
+<b>Watch this space!</b> as there's a new mixin in the pipeline: <code>&lt;dr:DataRenderer /&gt;</code>

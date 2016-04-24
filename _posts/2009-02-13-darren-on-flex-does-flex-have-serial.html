@@ -1,0 +1,28 @@
+---
+layout: post
+title: 'Darren on Flex: Does Flex Have Serial Version Ids?'
+date: '2009-02-13T01:18:00.014Z'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+modified_time: '2009-02-26T08:17:13.347Z'
+thumbnail: http://4.bp.blogspot.com/_Q_F_ea5EKi0/SZTNwSJQaKI/AAAAAAAAAEE/MDQuV6cOfXI/s72-c/flex-serial-version-id.jpg
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-8851794556685362338
+blogger_orig_url: http://blog.darrenbishop.com/2009/02/darren-on-flex-does-flex-have-serial.html
+---
+
+<h4>... And if it does, why don't they use them?</h4>
+I came across this weird bug (see below) ages ago, that is ~6-8months, when trying to implement some custom drag'n'drop behaviour in a modular application.
+
+<a onblur="try {parent.deselectBloggerImageGracefully();} catch(e) {}" href="http://4.bp.blogspot.com/_Q_F_ea5EKi0/SZTNwSJQaKI/AAAAAAAAAEE/MDQuV6cOfXI/s1600-h/flex-serial-version-id.jpg"><img style="display:block; margin:0px auto 10px; text-align:center;cursor:pointer; cursor:hand;width: 400px; height: 162px;" src="http://4.bp.blogspot.com/_Q_F_ea5EKi0/SZTNwSJQaKI/AAAAAAAAAEE/MDQuV6cOfXI/s400/flex-serial-version-id.jpg" border="0" alt=""id="BLOGGER_PHOTO_ID_5302088890709993634" /></a>
+
+I had no flipping clue what it was going on about, threw my hands up in disgust and frustration and just shelved the whole thing (actually had to go earn my pay).
+
+I just recently came back to the drag'n'drop thing, developing in a singular app style. On completing what I set out to achieve (well, making satisfactory progress, [blog to follow]), I decided to revisit this bug. I found a work-around on Adobe's JIRA site but was confused by all the chatter. I Googled a bit more and found <a href="http://gregjessup.com/flex-3-advanceddatagrid-cannot-convert-mxmanagersdragmanagerimpl-to-mxmanagersidragmanager/trackback/">Greg Jessup's</a> blog, where he posted the workaround some months earlier.
+
+With Greg's clear post, it was easy for me to rationalise this bug, such that I no-longer believe it is a bug... or rather not the WTF-kind. I categorize it now as a matter of some runtime-binary-compatibility issue, serializationy thingy. Hence why loading the classes in the Application (thus sharing the binary amongst the modules) solves the problem.
+
+I believe in the Java world, this is the kind of thing a serial-version-id is used to guard against, no?
+
+Anyway, cheers Greg.

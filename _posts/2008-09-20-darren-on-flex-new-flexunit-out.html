@@ -1,0 +1,34 @@
+---
+layout: post
+title: 'Darren on Flex: New FlexUnit 0.9 Out!'
+date: '2008-09-20T09:41:00.015+01:00'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- TDD
+- Agile
+- Testing
+modified_time: '2008-09-20T10:35:54.888+01:00'
+thumbnail: http://3.bp.blogspot.com/_Q_F_ea5EKi0/SNTC3zRJxyI/AAAAAAAAADc/Edo2KlXkO1s/s72-c/ScreenHunter_03+Sep.+20+10.08.jpg
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-8796253195330868124
+blogger_orig_url: http://blog.darrenbishop.com/2008/09/darren-on-flex-new-flexunit-out.html
+---
+
+FlexUnit-0.9 has been released by Adobe Cosulting.
+
+<a onblur="try {parent.deselectBloggerImageGracefully();} catch(e) {}" href="http://3.bp.blogspot.com/_Q_F_ea5EKi0/SNTC3zRJxyI/AAAAAAAAADc/Edo2KlXkO1s/s1600-h/ScreenHunter_03+Sep.+20+10.08.jpg"><img style="display:block; margin:0px auto 10px; text-align:center;cursor:pointer; cursor:hand;" src="http://3.bp.blogspot.com/_Q_F_ea5EKi0/SNTC3zRJxyI/AAAAAAAAADc/Edo2KlXkO1s/s320/ScreenHunter_03+Sep.+20+10.08.jpg" border="0" alt=""id="BLOGGER_PHOTO_ID_5248033729704216354" /></a>
+I believe this is the first release since the projects move from Google Code to <a href="http://opensource.adobe.com/wiki/display/flexunit/FlexUnit">Adobe open Source</a>.
+I have browsed the source code and nothing seems to have changed; obviously, community, please can correct me if I am wrong.
+
+There is still a lingering reference to the <code>flexunit.extensions.TestSetup</code> class which is still nowhere to be seen. Indeed I discovered the update while trying to find the standard approach to test-suite setup and teardown; subquently deciding it is is not the solution to my problem anyway.
+
+The most significant change, if only change, is the UI. We have:
+<ul>
+<li><b>An active search filter</b> that narrows down the displayed list of test methods, matching on test (method) name.</li>
+<li><b>A combobox with three result options</b>: <b>All Results</b>, <b>Empty Tests</b> and <b>Failures &amp; errors</b>; this replaces the tabbed view in the old version.</li>
+<li><b>A red cross or green tick</b> indicating the obvious, with a fat red cross or green tick to indicate overall (test-suite) pass or failure; it's a sad day - we've lost our beloved red-bar-green-bar.</li>
+<li><b>In the event of an error/failure, improved diagnostic feedback.</b> Just the other day I was getting frustrated with the old version, scrolling through the stack trace to find what class and which line of code <i>I wrote</i> (as opposed to FlexUnit code) that caused the breakage; well, it seems I won't have to suffer that anymore.</li>
+</ul>Overall, it just looks a lot more charming.
+
+Check it out, literally.

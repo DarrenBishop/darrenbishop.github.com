@@ -1,0 +1,301 @@
+---
+layout: post
+title: 'Darren on Flex: FlexUnit4 Testing with Parsley - Testing with Mock Injections'
+date: '2014-11-19T16:53:00.002Z'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- TDD
+- Agile
+- FlexUnit
+- FlashBuilder
+- Parsley
+- Flexmojos
+- Mocking
+- DSL
+- Testing
+modified_time: '2014-11-24T14:37:12.549Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-5011412335704370883
+blogger_orig_url: http://blog.darrenbishop.com/2014/11/darren-on-flex-flexunit4-testing-with.html
+---
+
+In <a href="/2011/06/darren-on-flex-flexunit4-testing-with.html">Part-5</a> I showed how to tidy away all (most of) the Parsley Messaging and Flex event management boiler-plate by extending the Fluint-aware DSL introduced in Part-3, which made tests Parsley-aware.<br />
+<br />
+This much overdue final part of the FlexUnit4 Testing with Parsley series demonstrates mock injection and leverages Mockito-Flex to achieve that.<br />
+(I will give a shout to the team behind Mockolate, as that is also a very good mocking library)<br />
+<br />
+Mockito-Flex utilizes ASMock internally and I encountered a problem where the application-domain used by ASMock for creating mocks, differed from that used by Parsley for its managed context environment.<br />
+I managed to clone and patch the Mockito-Flex codebase (pull-request imminent) such that in this patched version, Mockito-Flex specifies to ASMock what application domain to use. Awesome!<br />
+<br />
+<h2>The 'test' code re-re-re-re-revisted...</h2><h5>Mock Injection</h5>Previously, a stubbed service implementation was used to provide the behaviour needed for the successful running of the tests.<br />
+The smell that comes with using stubs is that they tend to introduce <i>test logic</i>, as was the case here, which is:<br />
+<ol style="list-style-type: lower-alpha"><li>Only implicitly tested, by default of being used in a test and...</li>
+<li>Only ever used through test code and not main/business code, so does not really represent any business value</li>
+</ol>Furthermore, this <i>test logic</i> resides in a different class to the test making it harder to understand what is going on (or harder to debug it if/when something goes wrong).<br />
+<br />
+We can rid ourselves of these code-smells by using mocking; the DSL provided by Mockito-Flex allows us to declaritively specify how the mocks in our Parsley context must behave AND we do that in-line with our tests.<br />
+<br />
+With the mocking and Parsley-aware DSLs combined, we still get to write easy-to-read story-style tests i.e. given-when-then, like we did before.<br />
+<br />
+<h5>DSL(Mocking + Parsley) - Inheritance = A New Approach</h5><pre class="brush: as3">package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.GetPersonCommandMockedComponentTestContext;
+    import com.darrenbishop.crm.directory.domain.Person;
+    import com.darrenbishop.support.create;
+    import com.darrenbishop.support.flexunit.parsley.ParsleyDslRule;
+    import com.darrenbishop.support.flexunit.parsley.dsl.*;
+
+    import flash.events.ErrorEvent;
+
+    import org.hamcrest.assertThat;
+    import org.hamcrest.object.equalTo;
+    import org.mockito.integrations.flexunit4.MockitoRule;
+    import org.mockito.integrations.given;
+
+    public class GetPersonCommandMockedParsleyRuleDSLComponentTest {
+
+        [Rule(order=1)]
+        public var mockito:MockitoRule = new MockitoRule();
+        
+        [Rule(order=2)]
+        public var parsley:ParsleyDslRule = new ParsleyDslRule(GetPersonCommandMockedComponentTestContext);
+        
+        [Mock]
+        public var service:DirectoryService;
+        
+        [Inject]
+        public var command:GetPersonCommand;
+        
+        public var dodgyPerson:Person;
+        
+        public var soundPerson:Person;
+        
+        [Before]
+        public function prepareEntities():void {
+            dodgyPerson = create(Person, {'id': 1, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6803225});
+            soundPerson = create(Person, {'id': 2, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168});
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler does not mangle the person found.')]
+        public function resultDoesNotManglePersonFound():void {
+            given(service.lookupById(soundPerson.id)).will(returnEventually(soundPerson));
+
+            dispatchMessage(PersonEvent.newLookup(soundPerson.id));
+            
+            waitForMessage(PersonEvent.FOUND);
+            then(function(event:PersonEvent, data:*):void {
+                assertThat(event.type, equalTo('PersonEvent.found'));
+                assertThat(event.person.fullname, equalTo('John002 Smith002'));
+            });
+        }
+
+        [Test(async,description='Test GetPersonCommand result-handler verifies the id of the person found.')]
+        public function resultVerifiesPersonFound():void {
+            given(service.lookupById(dodgyPerson.id)).will(returnEventually(soundPerson));
+
+            dispatchMessage(PersonEvent.newLookup(dodgyPerson.id));
+            
+            waitForError(ErrorEvent.ERROR);
+            then(function(event:ErrorEvent, data:*):void {
+                assertThat(event.text, equalTo(fmt('Found person (%d) does not match lookup person (%d)', soundPerson.id, dodgyPerson.id)));
+            });
+        }
+    }
+}
+</pre><br />
+The first thing to notice is the test-case no-longer needs to inherit from the <code>ParsleyHelper</code> class; all that DSL goodness is made available in standalone functions, in much the same way as those provided in the <code>org.hamcrest.*</code>, <code>org.mockito.integrations.*</code> packages and Flex' top-level package.<br />
+<br />
+Swapping out <code>ParsleyRule</code> and using <code>ParsleyDslRule</code> instead activates this non-inheritance approach; <i>under-the-hood</i> it ensures that each test will run in isolation and that any invoked Parsley-aware DSL-function will use the same singletons/managed-objects for that test e.g. the same <code>[MessageDispatcher]</code> or <code>EventDispatcher</code>.<br />
+<br />
+Some test developers use inheritance to implement a suite of similar tests - given Flex only supports single-inheritance - it is nice to have the inheritance-chain freed-up to allow them to continue to do so.<br />
+<br />
+That's all there really is to it!<br />
+<br />
+The change to Mockito-Flex that allows us to specify the application domain is included below, along with the two additional classes that are needed to make the mock-injection work:<br />
+<br />
+<pre class="brush: diff">--- mockito-flex/mockito/src/main/flex/org/mockito/integrations/flexunit4/MockitoRule.as (revision 87:8a8720f988e55bc8daf60144d8d73e63a8cc69b7)
++++ mockito-flex/mockito/src/main/flex/org/mockito/integrations/flexunit4/MockitoRule.as (revision 87+:8a8720f988e5+)
+@@ -10,6 +10,7 @@
+ import org.flexunit.runners.model.FrameworkMethod;
+ import org.flexunit.token.AsyncTestToken;
+ import org.mockito.Mockito;
++import org.mockito.impl.AsmockADMockeryProvider;
+ import org.mockito.integrations.currentMockito;
+ 
+ public class MockitoRule extends MethodRuleBase implements IMethodRule
+@@ -19,7 +20,7 @@
+         super();
+     }
+ 
+-    private function classFor(test:Object):Class
++    protected function classFor(test:Object):Class
+     {
+         return Class(getDefinitionByName(getQualifiedClassName(test)));
+     }
+@@ -27,7 +28,7 @@
+     override public function apply(base:IAsyncStatement, method:FrameworkMethod, test:Object):IAsyncStatement
+     {
+         var sequencer:StatementSequencer = new StatementSequencer();
+-        currentMockito = new Mockito();
++        currentMockito = new Mockito(AsmockADMockeryProvider);
+         sequencer.addStep(withMocksPreparation(classFor(test)));
+         sequencer.addStep(withMocksAssignment(classFor(test), test));
+         sequencer.addStep(base);
+</pre><br />
+<pre class="brush: as3">package org.mockito.impl
+{
+    import org.mockito.api.MockCreator;
+    import org.mockito.api.MockInterceptor;
+    import org.mockito.api.MockeryProvider;
+    import org.mockito.api.SequenceNumberGenerator;
+    import org.mockito.api.SequenceNumberTracker;
+
+    /**
+     *
+     * Implementation of the mockery provider that creates asmock based implementation
+     */
+    public class AsmockADMockeryProvider implements MockeryProvider
+    {
+        private var mockInterceptor:MockInterceptor;
+
+        private var mockCreator:AsmockADMockery;
+
+        /**
+         * Creates mockery provider
+         */
+        public function AsmockADMockeryProvider(sequenceNumberGenerator:SequenceNumberGenerator, sequenceNumberTracker:SequenceNumberTracker)
+        {
+            mockInterceptor = new MockInterceptorImpl(sequenceNumberTracker);
+            mockCreator = new AsmockADMockery(mockInterceptor, sequenceNumberGenerator);
+        }
+
+        /**
+         * Returns MockCreator
+         * @return implementation of MockCreator
+         */
+        public function getMockCreator():MockCreator
+        {
+            return mockCreator;
+        }
+
+        /**
+         * Returns MockInterceptor
+         * @return implementation of MockInterceptor
+         *
+         */
+        public function getMockInterceptor():MockInterceptor
+        {
+            return mockInterceptor;
+        }
+    }
+}
+</pre><br />
+<pre class="brush: as3">package org.mockito.impl
+{
+    import asmock.framework.MockRepository;
+    import asmock.framework.asmock_internal;
+
+    import flash.events.ErrorEvent;
+    import flash.events.Event;
+    import flash.events.IEventDispatcher;
+    import flash.system.ApplicationDomain;
+    import flash.utils.Dictionary;
+
+    import org.flemit.reflection.MethodInfo;
+    import org.flemit.reflection.Type;
+    import org.floxy.IInvocation;
+    import org.mockito.api.Invocation;
+    import org.mockito.api.MockCreator;
+    import org.mockito.api.MockInterceptor;
+    import org.mockito.api.SequenceNumberGenerator;
+
+    use namespace asmock_internal;
+
+    /**
+     * Asmock bridge. Utilizes asmock facilities to create mock objects.
+     * @private
+     */
+    public class AsmockADMockery extends MockRepository implements MockCreator
+    {
+        public var interceptor:MockInterceptor;
+
+        protected var _names:Dictionary = new Dictionary();
+
+        private var sequenceNumberGenerator:SequenceNumberGenerator;
+
+        public function AsmockADMockery(interceptor:MockInterceptor, sequenceNumberGenerator:SequenceNumberGenerator)
+        {
+            super(new ADProxyRepository(ApplicationDomain.currentDomain));
+            this.interceptor = interceptor;
+            this.sequenceNumberGenerator = sequenceNumberGenerator;
+        }
+
+        /**
+         * A factory method that creates Invocation out of asmock invocation
+         * @param invocation asmock invocation object
+         * @return mockito invocation
+         *
+         */
+        public function createFrom(invocation:IInvocation):Invocation
+        {
+            var niceMethodName:String = new AsmockMethodNameFormatter().extractFunctionName(invocation.method.fullName);
+            return new InvocationImpl(invocation.invocationTarget,
+                    invocation.method.fullName,
+                    invocation.arguments,
+                    new AsmockOriginalCallSeam(invocation),
+                    sequenceNumberGenerator.next());
+        }
+
+        public function prepareClasses(classes:Array, calledWhenClassesReady:Function, calledWhenPreparingClassesFailed:Function = null):void
+        {
+            var dispatcher:IEventDispatcher = super.prepare(classes);
+            var repositoryPreparedHandler:Function = function (e:Event):void
+            {
+                calledWhenClassesReady();
+            };
+            
+            var repositoryPreparationFailed:Function = function (e:Event):void
+            {
+                if (calledWhenPreparingClassesFailed != null)
+                    calledWhenPreparingClassesFailed();
+            };
+            dispatcher.addEventListener(Event.COMPLETE, repositoryPreparedHandler);
+            dispatcher.addEventListener(ErrorEvent.ERROR, repositoryPreparationFailed);
+        }
+
+        public function mock(clazz:Class, name:String = null, constructorArgs:Array = null):*
+        {
+            if (name == null)
+            {
+                name = Type.getType(clazz).name;
+            }
+            var mock:Object = createStrict(clazz, constructorArgs);
+            registerAlias(mock, name);
+            return mock;
+        }
+
+        override asmock_internal function methodCall(invocation:IInvocation, target:Object, method:MethodInfo, arguments:Array):*
+        {
+            return interceptor.methodCalled(createFrom(invocation));
+        }
+
+        /**
+         *
+         * @param mock
+         * @param name
+         */
+        public function registerAlias(mock:Object, name:String):void
+        {
+            _names[mock] = name;
+        }
+    }
+}
+</pre><br />
+<h4>Epilogue</h4><br />
+Although I doubt anyone has been waiting, apologies for taking so long to wrap this all up.<br />
+All the same, it was an interesting exercise to figure all this out.<br />
+<br />
+Ironically, I likely will not be engaging in any Flex development going forward, as I have recently turned my attention to iOS and SCALA.<br />
+<strike>However I will commit to getting the Mockito-Flex changes pushed to my <a href="https://bitbucket.org/DarrenBishop/mockito-flex">fork on BitBucket</a> and raise a pull request with Loomis, the author.</strike> <b><a href="https://bitbucket.org/loomis/mockito-flex/pull-request/1/fix-to-specify-application-domain-for-mock/diff">DONE!</a></b><br />
+<br />
+Thanks for reading and comments are welcome as always.

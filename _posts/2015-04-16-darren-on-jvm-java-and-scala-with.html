@@ -1,0 +1,59 @@
+---
+layout: post
+title: 'Darren on the JVM: Java and Scala with IntelliJ''s Compile Server'
+date: '2015-04-16T12:17:00.000+01:00'
+author: Darren Bishop
+tags:
+- Compilation
+- Specs
+- Java
+- TDD
+- JUnit
+- JVM
+- Scala
+- CC
+- IDEA
+- ScalaTest
+- Agile
+- BDD
+- Continuous
+- IntelliJ
+modified_time: '2015-04-16T12:46:13.902+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-891807952623914080
+blogger_orig_url: http://blog.darrenbishop.com/2015/04/darren-on-jvm-java-and-scala-with.html
+---
+
+<blockquote><h3>PROLOGUE</h3>I went searching YouTrack, doing my due diligence, for an issue (described below) before raising a feature request for IntelliJ's Compile Server facility.<br />
+<br />
+I came across this <a href="https://youtrack.jetbrains.com/issue/SCL-8235">issue</a>, which describes slow compilation despite having the compile server enabled.<br />
+<br />
+I echo here my <a href="https://youtrack.jetbrains.com/issue/SCL-8235#comment=27-976938">comments</a> and findings<br />
+</blockquote><br />
+If you are trying to make use of IntelliJ's Compile Server facility, say, to make you <em><span style="color:red">Red</span>, <span style="color:green">Green</span>... <span style="color:#FFBF00">Refactor</span></em> cycle go really fast, but can't seem to make it work or observe any speed gains, you may have overlooked an important step.<br />
+<br />
+If when you make a change and click <code>Run</code> or press <code>Shift+F10</code> and IntelliJ proceeds to <em>'make'</em> your project, this applies to you.<br />
+<br />
+The problem isn't to do how the Compile Server is configured; it has everything to do with your run configurations.<br />
+<br />
+When you right-click a test or <em>'main'</em> class, amongst other things, you have the option to <em>'Create Run Configuration'</em> or <em>'Run'</em> or <em>'Debug'</em>; the first option creates a run configuration and pops-up a form to make changes before saving it (does not actually run it), where as the last two create run configurations for you implicitly, which IntelliJ reuses if you attempt to re-run/debug the same package/class/method element again later.<br />
+<br />
+In <i>ALL</i> cases, not just these three, run configurations are created from a list of default configurations. The default for these three cases and many others, include the <em>'make'</em> Before launch task.<br />
+<br />
+This can be easily verified by playing around with the defaults and making implicit run configurations by right-clicking stuff as per normal.<br />
+<br />
+But to address the slow compilation:<br />
+<br />
+<ol><li>Modify the default templates for the run configurations of interest - I changed Application, JUnit Test, Scala Console, ScalaTest and Spec2 - and removed the <em>'make'</em> entry in the <em>'Before launch'</em> section.</li>
+<li>Edit your existing run/test configurations, also removing the <em>'make'</em> <em>'Before launch'</em> section.</li>
+</ol><br />
+Unless you explicitly change your configuration defaults, right clicking on a test and selecting run will always generate a configuration with the <em>'make'</em> task present.<br />
+<br />
+Having just read all the blog posts from IntelliJ regarding the Compile Server and SBT's source-base change analysis, they clearly forgot to mention this important step.<br />
+<br />
+Once removed, you can see when clicking <code>Run</code> the test runner starts spinning up immediately (assuming you're trying to run tests).<br />
+<br />
+The only issue I have seen here (I have searched YouTrack for a mention of it to no avail) is if you make a change and hit <code>Run</code> or <code>Shift+F10</code> immediately, the test runner might fail as the test class is momentarily not on the classpath, that is, in that brief window between detecting the change and the compile server doing its thing.<br />
+<br />
+However, clicking <code>Run</code> (<code>Shift+F10</code>) normally succeeds on the second attempt and it is still infinitely faster than waiting for a needless make to complete.<br />
+<br />
+Now my IntelliJ seems truly amazing

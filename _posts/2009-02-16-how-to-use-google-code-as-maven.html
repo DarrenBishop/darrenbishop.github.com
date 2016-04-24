@@ -1,0 +1,20 @@
+---
+layout: post
+title: 'How To: Use Google Code as a Maven Repository'
+date: '2009-02-16T00:52:00.007Z'
+author: Darren Bishop
+tags:
+- Google
+- Maven
+modified_time: '2009-02-26T08:15:09.254Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-5844464708922044371
+blogger_orig_url: http://blog.darrenbishop.com/2009/02/how-to-use-google-code-as-maven.html
+---
+
+While working on my new <a href="https://sites.google.com/site/flexinsproject/Home">Flexins Project</a> and <a href="http://workingwithmrb.blogspot.com/2009/02/darren-on-flex-flexins-project-launch.html">blogging</a> accordingly, I decided to explore using Maven and <a href="http://flex-mojos.info/">Flex-Mojos</a> to build the libraries and showcase applications.
+
+I have a local install of Nexus, where I hide away most of the complexity that would otherwise be in my <code>settings.xml</code> files. I typically deploy to this repo for my own benefit where I might chose to make it public in the future so I can work on stuff (drag in deps) from anywhere. However, it is not a viable option if my or your aim is to truly make one's binaries publicly available (saving the curious the trouble of a compiling source).
+
+Some how I stumbled on to Don Brown's Weblog, where he talks about turning a Google Code project, that is the site itself with its SVN, into a Maven repository. I have not yet done this myself, but the details are <a href="http://www.jroller.com/mrdon/entry/find_of_the_day_wagon">here</a>.
+
+Cheers

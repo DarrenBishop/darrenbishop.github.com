@@ -1,0 +1,174 @@
+---
+layout: post
+title: 'Darren on Blogger: Markdown & Gists for Blogger via Classeur'
+date: '2016-01-08T16:28:00.001Z'
+author: Darren Bishop
+tags:
+- jquery
+- syntaxhighlight
+- javascript
+- gist
+- blogger
+- pagination
+- github
+modified_time: '2016-01-11T20:43:50.466Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-3135539692630088872
+blogger_orig_url: https://www.blogger.com/comment.g?blogID=3826577489563855618&postID=3135539692630088872
+---
+
+<p>I the gist of it is, I just ironed out the last creases in a a new blogging workflow that leverages <a href="http://Classeur.io">Classeur.io</a>.</p>
+<p>If you don’t want to the back-story of how I came to this, skip ahead to <a href="#handlebars-templating">Handlebars Templating</a>.</p>
+<h2 id="back-story">Back Story</h2>
+<p>For ages now I’ve been frustrated by the lack of innovation on Blogger… and for a while, I was equally lazy in moving off the platform.</p>
+<p>It bothered me that I could not paginate my blog posts; more recently I got fed up writing technical blogs owing to the fact that writing HTML and embedding code snippets was just a chore.</p>
+<p>I investigated switching to WordPress and GitHub Pages, but that was quite daunting:</p>
+<ul>
+<li>WordPress want to charge me to stick my domain on my blog</li>
+<li>Everyone wants to charge me for a ‘self-hosting’… I don’t expect freeness, but my own domain provider (1and1) seem quite rigid in that it’s a whole separate package; ideally I would bolt-on to one of the 3 domains I am already paying them for.</li>
+<li>As for GitHub Pages… Jekyll… enough said</li>
+</ul>
+<p>I have long since solved my pagination problem, I wrote a bit about it <a href="http://blog.darrenbishop.com/2015/02/blogger-pagination-with-jquery.html">here</a>.</p>
+<p>So I started looking for ways to get some Markdown goodness and not lose the functionality I had already, namely pagination as mentioned, but also <a href="http://alexgorbatchev.com/SyntaxHighlighter">syntax highlighting</a>.</p>
+<p>I have been using <a href="http://StackEdit.io">StackEdit.io</a> for a while in a sort of broken out-of-band process, but recently discovered those guys released a more well rounded product (service), <a href="http://Classeur.io">Classeur.io</a>.</p>
+<p>The Standard/Free package is all I need: integration with 1 blog, but unlimited posts. Booom!</p>
+<p>Still <a href="http://Classeur.io">Classeur.io</a> does not quite hit the mark out-of-the-box: it wants to do its own syntax highlighting for code blocks, which I was not happy with, and it broke my pagination.</p>
+<p>Luckily, Classeur is quite (just enough) customizable; after a crash course in <a href="http://handlebarsjs.com">Handlebars.js</a> and what was probably my <script type="math/tex" id="MathJax-Element-7">1 \times 10^{1E6}th</script> JavaScript crash course, I finally got everything working.</p>
+<p>Bye-bye Blogger UI!</p>
+<h2 id="classeurs-particulars">Classeurs Particulars</h2>
+<h4 id="preserving-pagination">Preserving Pagination</h4>
+<p>I accomplish this by defining a boolean blog/file property <code>file.content.properties.paginate</code>. When specified on the Classeur document as <code>true</code>, the necessary functionality is triggered in the Handlebars helper.</p>
+<p>While authoring, pages are demarked by level-2 headings</p>
+<pre class=" brush: js">  
+## Start of Page 1
+
+Page 1 content
+
+## Start of Page 2
+
+Page 2 content
+
+## Start of Page 3
+
+Page 3 content
+  
+</pre>
+<p>As is, the last page, page 3 here, will run to the end of the blog post.</p>
+<p>In actual fact, the post must not be left like this as there will not be any numbered navigation links rendered.</p>
+<p>To correct that a special heading is used</p>
+<pre class=" brush: js">\\
+## links ##
+  
+</pre>
+<p>Any heading level works and it need not be at the end of the post; any content following this special header will render like a footer, that is, it will be visible at all time, regardless what page is selected.</p>
+<h4 id="preserving-syntax-highlighting">Preserving Syntax Highlighting</h4>
+<pre class=" brush: js">\\
+```scala
+
+case class <span class="token class-name">BlogPost</span>(title: String, content: String)
+
+```
+  
+</pre>
+<p>renders like</p>
+<pre class=" brush: scala">\\
+case class BlogPost(title: String, content: String)
+  
+</pre>
+<h3 id="integrating-gists">Integrating Gists</h3>
+<pre class=" brush: scala">\\
+[gist id: 25d472722614786accf2 file: DateChrono.scala line: 2-4 nf ss]
+  
+</pre>
+<p>renders like this (that leading *<em>*</em> is just a hack to stop the gist from rendering :/)</p>
+<p><code data-gist-id="25d472722614786accf2" data-gist-file="DateChrono.scala" data-gist-line="2-4" data-gist-show-spinner="true" data-gist-hide-footer="true"></code></p>
+<h3 id="handlebars-templating">Handlebars Templating</h3>
+<h4 id="the-template">The Template</h4>
+<p>The template I use is merely the one suggested in the documentation for customizing</p>
+<pre class=" brush: js">\\
+{{ "{{" }}#transform file.content.properties.paginate}}
+   {{ "{{" }}{file.content.html}}}
+{{ "{{" }}/transform}}
+  
+</pre>
+<h4 id="the-helper">The Helper</h4>
+<p>The Handlebars code does a whole bunch of stuff in the <code>transform</code> helper</p>
+<pre class=" brush: js">Handlebars.registerHelper('transform', function(paginate, options) {
+    var result = options.fn(this);
+
+    function append(code, key, value) {
+          
+        return key ? code + ' data-gist-'+(key == 'lines' ? 'line' : key)+'="'+value+'"' : code;
+    }
+
+    function replaceGist(str, p1, p2, p3, p4, p5, p6, p7, p8, offset, s) {
+
+        var keyValues = [p1, p2, p3, p4, p5, p6, p7, p8]
+
+        var prefix = '&lt;code';
+
+        for (var i = 0; i &lt; keyValues.length; i += 2) {
+
+            prefix = append(prefix, keyValues[i], keyValues[i+1]);
+        }
+
+        var flags = [
+            /\b[nh]f\b/i, ' data-gist-hide-footer="true"',
+            /\b[nh]ln\b/i, ' data-gist-hide-line-numbers="true"',
+            /\b[nh]l\b/i, ' data-gist-show-loading="false"',
+            /\bss\b/i, ' data-gist-show-spinner="true"'
+        ]
+
+        var suffix = '&gt;&lt;/code&gt;';
+
+        for (var j = 0; j &lt; flags.length; j+=2) {
+
+            suffix = s.match(flags[j]) ? flags[j+1] + suffix : suffix;
+        }
+
+        return prefix + suffix;
+    }
+
+    var gistRE = /\[gist(?:\s+([-\w]+):\s*([^\s\]]+?))?(?:\s+([-\w]+):\s*([^\s\]]+?))?(?:\s+([-\w]+):\s*([^\s\]]+?))?(?:\s+([-\w]+):\s*([^\s\]]+?))?(?:\s\w+)*\]/g;
+
+    result = result.replace(gistRE, replaceGist);
+    
+    result = result.replace(
+        /&lt;span class="token \w+"(?: spellcheck="true")?&gt;(.+?)&lt;\/span&gt;/g,
+        '$1'
+    );
+    
+    result = result.replace(
+        /&lt;code class="prism\s+language-\w+"&gt;([\s\S]+?)&lt;\/code&gt;/g,
+        '$1'
+    );
+   
+    result = result.replace(
+        /&lt;pre class="(.*?)language-(\w+)([^&gt;]*)"&gt;/g,
+        '&lt;pre class="$1brush: $2$3"&gt;'
+    );
+
+
+    if (paginate) {
+        
+        result = result.replace(
+            /&lt;h(\d) id[^&gt;]*&gt;\s*links\s*&lt;\/h\1&gt;/gi,
+            '&lt;h2 class="pagelinks"&gt;&lt;/h2&gt;'
+        );
+    
+        result = result.replace(
+            /&lt;h2 id[^&gt;]*&gt;/g,
+            '&lt;h2 class="pagebreak"&gt;'
+        );
+        
+        <span class="token comment" spellcheck="true">/*result = result.replace(
+            /&lt;h(\d) id[^&gt;]*&gt;/g,
+            '&lt;h$1"&gt;'
+        );*/</span>
+    }
+   
+    return new <span class="token class-name">Handlebars.SafeString</span>(result);
+});
+
+</pre>
+<p>It  isn’t very nice have all that ode crammed in to one helper but initial attempts to split it out and have it work with a more <em>involved</em> template failed.</p>
+<h2 id="blogger-particulars">Blogger Particulars</h2>

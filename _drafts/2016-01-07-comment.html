@@ -1,0 +1,63 @@
+---
+layout: post
+title: 'Darren on the JVM: Scala: Labelled Bitmasks and Regex to Pattern Conversion'
+date: '2016-01-07T09:47:00.000Z'
+author: Darren Bishop
+tags:
+- JVM
+- bitmask
+- Scala
+- regexp
+modified_time: '2016-01-07T10:02:36.815Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-3422122342782755448
+blogger_orig_url: https://www.blogger.com/comment.g?blogID=3826577489563855618&postID=3422122342782755448
+---
+
+<blockquote><h2 id="prologue">PROLOGUE</h2><p><a>:(</a><br />
+</p></blockquote><h2 id="section-heading">Section Heading</h2><blockquote>Block-quote </blockquote><p><sub>Sub-script</sub></p><h2 id="section-heading-1">Section Heading</h2><ul><li>Unordered List Item</li>
+<li>Unordered List Item</li>
+</ul><ol><li>Ordered List Item</li>
+<li>Ordered List Item</li>
+</ol><h2 id="section-heading-2">Section Heading</h2><h5 id="sub-heading">Sub Heading</h5><pre class=" brush: java">import scala.util.matching.Regex
+
+package object regex {
+
+  sealed abstract class <span class="token class-name">RegexFlag</span>(val code: String, val bitMask: Int) {
+
+    def +(other: RegexFlag) = new <span class="token class-name">RegexFlag</span>(code+other.code, bitMask | other.bitMask) { }
+    def ==(other: RegexFlag) = bitMask == other.bitMask
+    def =~(bitMask: Int) = (bitMask &amp; this.bitMask) == this.bitMask
+    override def toString = code
+  }
+
+  case object UnixLines extends <span class="token class-name">RegexFlag</span>("d", UNIX_LINES)
+  case object CaseInsensitive extends <span class="token class-name">RegexFlag</span>("i", CASE_INSENSITIVE)
+  case object Comments extends <span class="token class-name">RegexFlag</span>("x", COMMENTS)
+  case object Multiline extends <span class="token class-name">RegexFlag</span>("m", MULTILINE)
+  case object DotAll extends <span class="token class-name">RegexFlag</span>("s", DOTALL)
+  case object UnicodeCase extends <span class="token class-name">RegexFlag</span>("u", UNICODE_CASE)
+  case object UnicodeCharacterClass <span class="token class-name">extends</span> RegexFlag<span class="token punctuation">(</span>"U", UNICODE_CHARACTER_CLASS)
+
+  private val allRegexFlags = List<span class="token punctuation">(</span>UnixLines, CaseInsensitive, Comments, Multiline, DotAll, UnicodeCase, UnicodeCharacterClass)
+
+  case class <span class="token class-name">RegexWithFlags</span>(regex: Regex) {
+
+    def =~(regexFlag: RegexFlag) = regexFlag =~ mask
+    def =~(regexFlags: List[RegexFlag]) = regexFlags.forall { rf =&gt; rf =~ mask }
+
+    lazy val mask = regex.pattern.flags
+    lazy val flags = allRegexFlags.fold<span class="token punctuation">(</span>new <span class="token class-name">RegexFlag</span>("", 0) {}) {
+      case (acc, rf) if rf =~ mask =&gt; acc+rf
+      case (acc, _) =&gt; acc
+    }.code
+    override def toString = flags
+  }
+
+  implicit def regex2RegexWithFlags<span class="token punctuation">(</span>regex: Regex) = RegexWithFlags<span class="token punctuation">(</span>regex)
+
+  implicit class <span class="token class-name">BooleanRegEx</span>(re: Regex) {
+    def ~=(term: String) = re.findFirstIn<span class="token punctuation">(</span>term).nonEmpty
+    val ~ = ~= _
+  }
+}
+</pre>

@@ -1,0 +1,131 @@
+---
+layout: post
+title: 'Darren on Blogger: Pagination for Blogger powered by jQuery'
+date: '2015-02-25T13:55:00.002Z'
+author: Darren Bishop
+tags:
+- jquery
+- post blogger
+- js
+- paging
+- seo
+- javascript
+- html
+- blog
+- pagination
+modified_time: '2016-01-08T15:43:18.795Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-3519481886386124893
+blogger_orig_url: http://blog.darrenbishop.com/2015/02/blogger-pagination-with-jquery.html
+---
+
+<blockquote><b>UPDATE:</b> Replaced all uses of the <code><del>pagelist</del></code> class with <code>pagelinks</code>, as depending on the template used, Blogger may or may not use this class to manage its 'blog pages' i.e. tabs.<br />
+</blockquote><br />
+Some time ago I wrote a <a href="http://blog.darrenbishop.com/2011/04/darren-on-flex-flexunit4-testing-with_11.html">6 part blog</a> and I have very recently written another <a href="http:">multi-part blog</a> that has the potential to be quite long.<br />
+<br />
+Once I have done the technical work for a blog post and start writing it up, if it becomes unwieldy, I split it into parts to make it more digestible for the reader.<br />
+<br />
+I observe that different parts receive different levels of traffic, which I take to mean either some parts aren't all that interesting or, put another way, in the era of the internet age, readers seek out the information they want specifically and nothing else.<br />
+<br />
+But for a while now, people who get a lot of traffic on their blog are choosing to monetize their published intellectual property, whether it be with AdSense or Amazon book lists or whatever.<br />
+<br />
+I'm no SEO or click-stream expert, but obviously there's a big difference between an e-Commerce site and the blog of an individual containing all sorts of ramblings; you'd expect e-Commerce sites to be more cohesive, but blogs not necessarily so.<br />
+<br />
+Whatever your online presence, you might find a trade-off between time spent on a page vs. bounce-rate.<br />
+<br />
+Again, while not being an expert, I figured it might be desirable for bloggers to keep visitors on a single blog post for longer using content pagination, with the caveat that consolidating a multi-part blog into a single multi-page blog will likely improve visit times but worsen bounce-rate.<br />
+<br />
+As an interesting exercise I thought I would have a go at implementing a JavaScript library to paginate Blogger.com blog posts.<br />
+<br />
+For the implementation, jQuery seemed like an obvious choice, recognising its popularity and as the incumbent technology for doing such things, least not because the work that inspired me was written using jQuery also.<br />
+<br />
+<b>NB: I am trying to publish this library as a Blogger gadget, but am yet to succeed - watch this space!</b><br />
+<br />
+<h2 class="pagebreak">Quickstart</h2><br />
+Structure you posts like so:<br />
+<ol><li>Leading and header content</li>
+<li>Start a page and each subsequent page with <code>&lt;h2 class="pagebreak"&gt;<em>Page Title</em>&lt;/h2&gt;</code></li>
+<li>End your paginated content with <code>&lt;h2 class="<del>pagelist</del>pagelinks"&gt;&lt;/h2&gt;</code></li>
+<li>Finsih off with trailing and footer content</li>
+</ol><b>NB: leading and trailing content will be visible always, regardless of which page you are on.</b><br />
+<h2 class="pagebreak">Pre-Requisites and Installation</h2>Make sure you have jQuery installed; as mentioned, I will try to bundle this as a gadget, but jQuery needs to be installed separately in your blog's template - Google will tell you how.<br />
+<br />
+Install a UUID function with the name <code>uuid</code> into jQuery so the paginator can use it like <code>$.uuid()</code><br />
+For your convience, you can use this UUID function adapted here for jQuery, lifted from <a href="http://stackoverflow.com/a/873856/133330">Kevin Hakanson's answer on StackOverflow</a>; edit the layout of you blog and add a 'HTML/JavaScript' gadget at the bottom with the following content:<br />
+<br />
+<script src="https://gist.github.com/DarrenBishop/81306210a1318a787a16.js"></script><br />
+To install the BlogPaginator code, again edit the layout of you blog and add a 'HTML/JavaScript' gadget at the bottom with the following content:<br />
+<br />
+<script src="https://gist.github.com/DarrenBishop/f8a843ebb2517944682f.js"></script><br />
+<br />
+<h2 class="pagebreak">Credit Where Credit is Due</h2><br />
+Firstly let me give a shout to <a href="http://www.triposoft.com/paginate-long-post-blogger/">Harshit Jain</a>, whose work largely inspired and seeded mine.<br />
+<br />
+I liked what I saw there but thought it was a bit too involved: let's say the blogger is your somewhat tech-savy, retired grandmother posting baking recipes; do we really want her taking time out from baking to fiddle around with jQuery? Hell nah! #wewantcake<br />
+<br />
+Also, the pages are statically formed and numbered, so adding new ones or restructuring becomes a chore.<br />
+<br />
+...now rinse and repeat for every blog post.<br />
+<br />
+So I sought to make this more automatic with minimal first-time setup - in installing the library - and just imposing the need to write HTML.<br />
+<br />
+<h2 class="pagebreak">The Approach</h2><br />
+So I had two objectives initially:<br />
+<ol><li>Allow bloggers to write new posts with pages added ad-hoc or worked into their document plan</li>
+<li>Allow bloggers to easily retro-fit long past posts or consolidate multi-part blog posts split instead across pages</li>
+</ol>It seemed intuitive to model a page as an item with content: old pre-existing blogs likely won't have such an obvious structure; while it is easy to plan a new post like this, you realise it isn't all that convenient when you start moving content and pages around - but we do not need to abandon this intuition just yet...<br />
+<br />
+Having worked a lot with XML, in all forms including HTML, I know you basically have two ways to process a document:<br />
+<ul><li>With the DOM, which is built upfront and you use something like XPath to traverse and locate the elements you want</li>
+<li>With a StAX parser, that processes a document tag (node) by tag, where start &lt;div&gt; and end &lt;/div&gt; tags are two different events (if I had to guess, a DOM would be built this way)</li>
+</ul>The StAX idea is key here and, combined with document manipulation, allows us to separate <em>the way content and pages are authored</em> from how <em>content and pages are rendered</em>, that is, a structural transformation.<br />
+<br />
+In other words, if you can drop in a <em>'bagebreak'</em> marker that your processor can use to create a new page and swallow up all the content until the next pagebreak, implying the end of a page and the start of the next, then we are on our way to a solution.<br />
+<br />
+This is easy, we just use a standard HTML tag; it can pretty much be anything, knowing we can replace it with something more useful and extract content - if it has any - and use it later.<br />
+<br />
+For this I chose the <code>h2</code> tag with a class value of <code>pagebreak</code>:<br />
+<blockquote><code>&lt;h2 class="pagebreak"&gt;Page Title&lt;/h2&gt;</code></blockquote>The <em>Page Title</em> will be extracted and used to build a Table of Contents (ToC).<br />
+<br />
+Using the <code>&lt;h2 /&gt;</code> tag this way feels a lot more natural and gets out the way of content authoring; you spend less effort thinking and implementing your pagination structure and more about what you want to write e.g. how she baked that cake!<br />
+<br />
+Once all the content is authored with pagebreaks, we need another marker to indicate to the processor that there are no more pages and it needs to insert the click-able page navigation functionality. The same principles apply here, but we use a class value of <code><del>pagelist</del>pagelinks</code> and note that any content is discarded:<br />
+<blockquote><code>&lt;h2 class="<del>pagelist</del>pagelinks"&gt;&lt;/h2&gt;</code></blockquote><br />
+<h2 class="pagebreak">The Implementation Details</h2><br />
+To implement this we don't actually use a StAX parser, we just simulate one using <a href="http://api.jquery.com/contents/">jQuery's <code>.contents()</code> method</a>; it's important to use <code>.contents()</code> and not <code>.children()</code> as the former is one of few jQuery operations that process text-nodes, whereas the latter does not.<br />
+<br />
+So when our pseudo-jQuery-StAX processor starts up, it creates a page for each <code>pagebreak</code> and some corresponding meta-data, until it sees a <code><del>pagelist</del>pagelinks</code>; at this point it knows:<br />
+<ol><li>Where the first page started</li>
+<li>How many pages there are</li>
+<li>The page title for each</li>
+<li>And where the last page ended, <em>which is not necessarily the end of the blog post!</em></li>
+</ol>So we can generate the page navigation links after the last page, but we can also jump back and insert another set of page navigation links before the first page too; this is useful for long pages where, if the page is sufficiently introduced, the reader can decide early whether to keep reading or click ahead or back without needing to scroll to the links at the bottom of the paginated section.<br />
+<br />
+Furthermore, with the page titles stored, we can jump back and insert a ToC, where the each page title links through to its page.<br />
+<br />
+For usability, the implementation disables links to the page you are currently on and also provides 'Show All' links.<br />
+<br />
+I have not (nor planned to) implement <em>First</em>, <em>Previous</em>, <em>Next</em> and <em>Last</em> semantics as I wouldn't expect a blog post to be that long - First and Last would be easy, Prev and Next a little less so.<br />
+<br />
+And that's it... for a sunny day scenario at least.<br />
+<br />
+<h2 class="pagebreak">What Happens When Multiple Posts Are Listed? Chaos!</h2><br />
+The above all works fine when, say in a testing scenario, you are writing a web page and using the <code>&lt;body /&gt;</code> tag to demark content for pagination i.e. with a <code>$("body")</code> jQuery.<br />
+<br />
+When in Blogger.com, pages must obey the rules like any other web-page, that is, the <code>&lt;body /&gt;</code> tag contains all the renderable content you see in the browser window, including all the Blogger.com chrome, navigation links, gadget content, adverts etc and when on you blog's landing page, all the (recent) posts listed too.<br />
+<br />
+The effect, in theory, is you get cross-post pagination, in practice you get a mess and missing content.<br />
+<br />
+There are two steps to counteract this:<br />
+<br />
+First we must set apart different posts and demark pagination content by something other than the <code>&lt;body /&gt;</code> tag; after some inspection you'll see Blogger.com use a <code>&lt;div /&gt;</code> tag with a <code>post-body</code> class entry to contain each post i.e.<br />
+<blockquote><code>&lt;div class="... post-body ..."&gt;&lt;/div&gt;</code></blockquote>We can grab this using a <code>$("div.post-body")</code> jQuery.<br />
+<br />
+Secondly, we need to make page links unique to a post so we don't get cross-post page linking.<br />
+<br />
+This is easily done by introducing a UUID and associating that with a post and all its corresponding page links.<br />
+<br />
+That's it, sunny day and rainy scenarios accounted for.<br />
+<h2 class="pagelinks"></h2><br />
+As always, feedback and comments are welcome.<br />
+<br />
+Also check back for progress updates on having this published as a Blogger.com gadget.

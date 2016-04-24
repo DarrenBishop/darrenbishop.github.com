@@ -1,0 +1,103 @@
+---
+layout: post
+title: 'Darren on Ruby: Migrating Rails to Tomcat / JEE, Part 1: Switching to JRuby
+  & Apache Derby'
+date: '2009-04-11T13:36:00.021+01:00'
+author: Darren Bishop
+tags:
+- Derby
+- Java
+- Rails
+- JRoR
+- Tomcat
+- SQLite3
+- JRuby
+- Ruby
+- RoR
+modified_time: '2009-04-17T09:09:07.302+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-7969152418791161062
+blogger_orig_url: http://blog.darrenbishop.com/2009/04/migrating-rails-to-jee-part-1-switching.html
+---
+
+<p>
+<h3>Prologue</h3><blockquote>Complete <a href="http://guides.rails.info/getting_started.html">this</a> tutorial as a prelude to this blog. This is less about you learning RoR, but more about giving you a convenient starting point to proceed. If you already have a project in mind that you want to migrate, make a copy and work with that.
+
+<b>Note for Windows users:</b> When you get to the point of installing the SQLite3 gem, use version 1.2.3 as at the time of this writing, it is the most recent version compatible with Windows;
+<code>gem install sqlite3-ruby -v 1.2.3 -y</code>.
+
+For your convenience, here are some links you might find useful while completing that tutorial:
+
+<a href="http://localhost:3000" target="_blank">http://localhost:3000</a><br />
+<a href="http://localhost:3000/home/index" target="_blank">http://localhost:3000/home/index</a></blockquote>
+</p>
+<p>
+<h4>Run it on Ruby</h4>
+So you should now be at a point where you can successfully run your application on Mongrel or WEBrick using MRI. If you haven't done that already, give that a whirl and test it by going <a href="http://localhost:3000" target="_blank">here</a>. You should see the <em>'Hello, Rails!'</em> home page. Now get you hands on the default generated <code>index.html</code> file and put it back in the public folder and hit refresh/F5. You should now see the <em>'Welcome aboard... You’re riding Ruby on Rails!'</em> welcome page. Click on the <em>'About your application’s environment'</em> link and you should see a flash message (I think that's what they call it) describing you environment; you should observe two things:
+<dl>
+<dt>Ruby Version
+<dd>1.8.6 (i386-mswin32)
+<dt>Database adapter
+<dd> sqlite3
+</dl>
+Now shut down the web server.
+</p>
+<p>
+<h4>Prepare for JRuby</h4>
+<ol>
+<li>Setup JRuby
+<ul>
+<li>Download and install JRuby 1.2.0 from <a href="http://dist.codehaus.org/jruby/1.2.0/jruby-bin-1.2.0.zip">here</a></li>
+<li>Set your <code>JRUBY_HOME</code> environment variable and add <code>JRUBY_HOME\bin</code> to your <code>PATH</code> environment variable.</li>
+<li>Checkout this <a href="http://workingwithmrb.blogspot.com/2009/04/jgem-jrake-for-your-convenience.html">blog</a> for <code>jgem</code> and <code>jrake</code></li>
+</ul></li>
+<li>Install Rails (currently 2.3.2)
+<ul>
+<li>jgem install rails -y</li>
+</ul></li>
+<li>Setup Apache Derby
+<ul>
+<li>Download and install Derby 10.4.2 from <a href="http://apache.mirror.rbftpnetworks.com/db/derby/db-derby-10.4.2.0/db-derby-10.4.2.0-bin.zip">here</a>.</li>
+<li>Set your <code>DERBY_HOME</code> environment variable and add <code>DERBY_HOME\bin</code> to your <code>PATH</code> environment variable.</li>
+<li>Copy <code>derby.jar</code>, <code>derbyclient.jar</code> and <code>derbynet.jar</code> in <code>DERBY_HOME\lib</code> to <code>JRUBY_HOME\lib</code>.</li>
+<li><code>jgem install activerecord-jdbcderby-adapter-0.9.0 -y</code> (I had an issue with version 0.9.1; something about an uninitialized constant...)</li>
+</ul>
+</li>
+<li>Prepare Development DB
+<ul>
+<li>Update the <code>RAILS_ROOT\config\database.yml</code> file; comment out the default <code>development</code> database definition (or just prepend an underscore or something) and paste in the following below it:
+<pre class="brush: bash">
+development:
+  adapter: jdbc
+  url: jdbc:derby:db\blog_development;create=true
+  driver: org.apache.derby.jdbc.EmbeddedDriver
+  username: app
+  password: app
+</pre>
+</li>
+<li>Run the following commands:
+<pre class="brush: bash">
+jrake db:sessions:create
+jrake db:migrate
+</pre>
+</li>
+</ul>
+</li>
+</ol>
+</p>
+<p>
+<h4>Run it on JRuby</h4>
+Now you should be at a point where you can run your application on Mongrel or WEBrick using JRuby. Start it up, this time running <code>jruby script\server</code> and test it again by going <a href="http://localhost:3000" target="_blank">here</a>. Click on the <em>'About your application’s environment'</em> link; this time you'll observe two significant differences:
+<dl>
+<dt>Ruby Version
+<dd>1.8.6 (java)
+<dt>Database adapter
+<dd> jdbc
+</dl>
+Well that's all folks - <b>You have now migrated to JRuby!</b>. But where are all your blogs?!
+</p>
+<p>
+<h4>What's Next?</h4>
+Next I will run through a couple of ways of migrating your SQLite3 data to Derby; when it's ready you can catch that blog <a href="http://workingwithmrb.blogspot.com/2009/04/darren-on-ruby-migrating-rails-to-jee.html" target="_blank">here</a>.
+
+Cheers.
+</p>

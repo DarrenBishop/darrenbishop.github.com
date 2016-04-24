@@ -1,0 +1,40 @@
+---
+layout: post
+title: 'Darren on Flex: Flexins, Drag ''n'' Drop Mixin now with Filtering'
+date: '2009-03-05T09:40:00.018Z'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- Google
+- Flexmojos
+- Git
+- Maven
+modified_time: '2011-04-05T00:08:26.605+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-8114161903549818083
+blogger_orig_url: http://blog.darrenbishop.com/2009/03/darren-on-flex-flexins-drag-n-drop.html
+---
+
+<h4>Recap of Version 0.2</h4>If you quickly go back and play with the demo in my <a href="http://workingwithmrb.blogspot.com/2009/02/darren-on-flex-flexins-drag-n-drop.html">previous blog</a> you'll find that you can't drag anything on the fourth, green quadrant. This is simply because it is not enabled by (the presence of) the mixin. You'll also find that both the <code>Panel</code> and <code>TitleWindow</code> can be dropped on to the nested purple region.
+
+<h4>Introducing Drop Filtering</h4>With version 0.3 you can now specify an inclusion filter that restricts what can and can't be dropped on to the corresponding drop-target. Have a play with this demo of version 0.3:
+
+<embed src="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin/dnd-mixin-demo-0.3.swf?attredirects=0" quality="high" bgcolor="#869ca7" width="100%" height="400" name="Main" align="middle" play="true" loop="false" quality="high" allowScriptAccess="sameDomain" type="application/x-shockwave-flash" pluginspage="http://www.adobe.com/go/getflashplayer">
+</embed>
+
+You'll notice 2 differences:
+<ol>
+<li>The fourth quadrant now accepts the nested purple region, but not the <code>Panel</code> nor the <code>TitleWindow</code>.</li>
+<li>The nested purple region now only accepts <code>TitleWindow</code>s, but not <code>Panel</code>s.</li>
+</ol>
+You can review the commit <a href="http://github.com/DarrenBishop/flexinsproject/commit/adc00e1198fd20b5c83576512e3a0a19731826a5">diff</a> at GitHub to see the difference in how the mixin is declared at the code-level.
+
+<h4>How It Works... In Brief</h4>The <code>dndFilter</code> property is of type <code>Array</code>. It expects an array of types i.e. the types of thing to include/allow to be dropped e.g. <code>TitleWindow</code>.
+If the <code>dndFilter</code> property is not specified at all, or is later assigned <code>null</code>, then this is treated as include/allow all types, as in wildcard semantics.
+That's it really. Visit the DnDMixin's <a href="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin">homepage</a> for more details and references to source code.
+
+<h4>What's Next</h4>Using the matching of types as the filter criterion might be a bit crude for some. One might want to base the filter criteria on some domain rules or something more dynamic (perhaps determined at runtime) than the types used in the UI, which incidentally do not (necessarily) bare any significance on the interaction that they are being used to support.
+
+This kind-of thing can be implemented using a filter function; the user could specify whatever criteria they want, complex or simple.
+
+<b>Watch this space!</b>

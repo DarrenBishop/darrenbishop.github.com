@@ -1,0 +1,55 @@
+---
+layout: post
+title: 'Darren on Flex: Binding Expression Clash With HTML Entity-Reference Delimeter'
+date: '2008-03-23T14:53:00.008Z'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+modified_time: '2008-09-20T10:25:50.386+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-8280464897763250573
+blogger_orig_url: http://blog.darrenbishop.com/2008/03/flex-3-binding-notation-clash-with-html_8641.html
+---
+
+You fellow Flex programmers should know all about the handy <a href="http://livedocs.adobe.com/flex/3/html/databinding_1.html#110674">binding</a> notation provided as a language construct in MXML. For those that don't know, it makes short work of event-wiring; forget implementing interfaces and defining handlers - just bind it.
+
+With binding in mind, recently I tried to bind to the <span style="font-style: italic;">AND</span> logical result but received an error in FB3. This highlights a feature of MXML, that is, the overlap of the symbol/name/token/something-space of embedded AS code and that of HTML/XML. To be clear, I am no talking about (instance) variable namespaces or scopes, Flex handles this seamlessly; what I am talking about is the names for constructs (or maybe it's syntax tokens) in those respective languages.  For example see the following code:
+<pre name="code" class="xml">
+&lt;application mx="http://www.adobe.com/2006/mxml" model="com.zuhlke.tutorial.hibernate.model.*" creationcomplete="eventDS.fill(events, 'all.events', [])" layout="vertical"&gt;
+
+...
+
+&lt;/application&gt;
+</pre>
+In this snippet we routinely assign an expression, in this case a function call, to be evaluated in response to the <code>creationComplete</code> event. Notice that to pass a String (i.e. <code>'all.events'</code>) as an argument we have to switch between quoting characters to maintain valid XML - not adding anything new here, this trick is age old.
+
+The following example demonstrates what I was trying to do, as described above:
+<pre name="code" class="xml">
+&lt;mx:TextInput id="eventTitle" width="100%" /&gt;
+&lt;mx:DateField id="eventDate" width="100%" /&gt;
+...
+
+&lt;mx:Button id="add"  label="Add..." enabled="{eventTitle.text != '' &amp;&amp; eventDate.text != ''}" click="addHandler()" /&gt;
+</pre>
+This code will not compile in FB3 as the <code>&&</code> ie. logical AND operator in the binding expression for the <code>Button.enabled</code> property clash with the entity-reference language construct for XML notation. So with knowledge converting between different logical expressions in the same equivalance class, we can re-write the binding expression such that the compiler is kept happy:
+
+<pre name="code" class="xml">
+&lt;mx:TextInput id="eventTitle" width="100%" /&gt;
+&lt;mx:DateField id="eventDate" width="100%" /&gt;
+...
+
+&lt;mx:Button id="add"  label="Add..." enabled="{!(eventTitle.text == '' || eventDate.text == '')}" click="addHandler()" /&gt;
+</pre>
+
+Now this is really a matter of taste; you can of course use the following instead:
+
+<pre name="code" class="xml">
+&lt;mx:TextInput id="eventTitle" width="100%" /&gt;
+&lt;mx:DateField id="eventDate" width="100%" /&gt;
+...
+
+&lt;mx:Button id="add"  label="Add..." enabled="{isEnabled(eventTitle.text, eventDate.text)}" click="addHandler()" /&gt;
+</pre>
+where a function with the signature <code>isEnabled(title:String, date:String):Boolean</code> does the job.
+
+<span style="font-weight: bold;">Note:</span> it seemed necessary to pass in the text properties of the <span style="font-style: italic;">TextInput</span> and <span style="font-style: italic;">DateField</span> components, I suspect because these are bindable properties, where the components themselves (in their context) perhaps are not.

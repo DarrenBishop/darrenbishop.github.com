@@ -1,0 +1,211 @@
+---
+layout: post
+title: 'Darren on the JVM: Scala Extension Methods, Some You Want & Some You Don''t'
+date: '2015-01-20T02:31:00.001Z'
+author: Darren Bishop
+tags:
+- Flex
+- Specs
+- TDD
+- JVM
+- Agile
+- Scala
+- BDD
+- Lift
+- Parsley
+- BlazeDS
+- ScalaTest
+modified_time: '2016-01-06T06:53:26.685Z'
+thumbnail: http://3.bp.blogspot.com/-WOa-WEWHdNw/VL1cX4tx_8I/AAAAAAAAAQk/l3CHTQAjpwc/s72-c/scala-tail-recursion.jpg
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-6466149218529284537
+blogger_orig_url: https://www.blogger.com/comment.g?blogID=3826577489563855618&postID=6466149218529284537
+---
+
+<blockquote><h3>PROLOGUE</h3>I came across an issue while preparing my stack for a blog I'm writing on Parsley managed persistence, which uses Parsley+Flex talking to BlazeDS+Scala+Lift.<br />
+<p>I eventually got the stack working, having tested connectivity using ScalaTest.<br />
+Admittedly, I got over excited with my achievement and the awesomeness of Scala and went off on a massive tangent trying to extend the DSL provided for FlatSpec-style testing.<br />
+<br />
+Again I succeeded, but not before some issues and another tangent.<br />
+<p><em>DISCLAIMER:</em> I have time on my hands at the moment so am at liberty to go off on the odd tangent or two.<br />
+If you don't want to hear about my journey of discovery and you just want to see a couple of ways to restrict what methods are exposed as extension methods, fast forward to <a href="#Restricting Implicit Methods">Restricting Implicit Methods</a><br />
+</blockquote><br />
+To quickly clarify the title, this blog is<br />
+<br />
+<ul><li>LESS a prescription of when you should want extension methods or if they are a good idea...</li>
+<li>MORE about what to do if you want to expose some methods of a source class as extension methods, but not all of them!</li>
+</ul><br />
+<h2>The Spec</h2><br />
+As mentioned, I embarked on this journey of discovery in trying to to test a Nickname service. Originally I had crafted the following spec:<br />
+<br />
+<pre class="brush: scala">"NicknameService" should "greet people with their nicknames" in { rpc =>
+
+    rpc("getGreeting", "Darren") should include("Dazzy")
+    rpc("getGreeting", "Jay") should include("zilla")
+    rpc("getGreeting", "Leon") should include("Giga")
+  }
+</pre><br />
+If you are familiar with ScalaTest, you'll recognise I have used the <code>withFixture(...)</code> feature to do some controlled setup and teardown; specifically I use this feature to handle the AmfConnection.<br />
+<br />
+<p>You'll also notice that <code>"getGreeting"</code> is specified 3 times!<br />
+<br />
+<p>Wouldn't it be nice to remove this redundancy and rewrite the spec like this:<br />
+<br />
+<pre class="brush: scala">"NicknameService" should "greet people with their nicknames" withMethod "getGreeting" in { call =>
+
+    call("Darren") should include("Dazzy")
+    call("Jay") should include("zilla")
+    call("Leon") should include("Giga")
+  }
+</pre><br />
+Well you can indeed extend the DSL i.e. with the <code>withMethod</code> clause (<code>with</code> is a reserved word in Scala), by implementing an extension method targeting <code>ResultOfStringPassedToVerb</code>:<br />
+<br />
+<pre class="brush: scala">@inline implicit def convertToWithMethod(resultOfStringPassedToVerb:ResultOfStringPassedToVerb):WithMethod =
+        WithMethodAndIn(resultOfStringPassedToVerb)
+</pre><br />
+My first attempt at implementing the <code>WithMethodAndIn</code> class is as follows:<br />
+<br />
+<pre class="brush: scala">case class WithMethod(resultOfStringPassedToVerb:ResultOfStringPassedToVerb) {
+        
+        private var method:String = _
+        
+        def withMethod(method:String) = {
+            this.method = method
+            this
+        }
+        
+        def in(testFun:TestFunction) {
+            val tf:TestFunction = (fp:FixtureParam) => {
+                val mfp:MethodFixtureParam = fp.asInstanceOf[MethodFixtureParam]
+                assert(method != null)
+                testFun(mfp.build(method))
+            }
+            
+            resultOfStringPassedToVerb.in(tf)
+        }
+    }
+</pre><br />
+As you can see I return <code>this</code> (inferred as <code>WithMethod</code>) from <code>withMethod(...)</code>.<br />
+<br />
+<p>I also implemented <code>def in(testFun:TestFunction)</code>, so not to break the final <code>in</code> clause of the test description, while still being able to access the <code>method</code> variable<br />
+(if <code>withMethod(...)</code> returned <code>resultOfStringPassedToVerb</code>, I'd never have a chance to use <code>method</code> and continue setting up the fixture).<br />
+<br />
+<p>It worked... but it didn't work!<br />
+<br />
+<h2>Attack of The Tail Recursion</h2>When I ran this test, the program never terminated. In fact, my test code never even got executed.<br />
+<br />
+<p>Funnily enough I could hear the computer's fan going for it, which prompted me to look in TaskManager, where I saw the process was holding steady at 50% CPU... Nice! An infinite loop!<br />
+<br />
+<p><em><a href="javascript:a1.play()">Hold on a minute!</a></em> Infinite loops should crash with a <code>StackOverflowError</code>!<br />
+<audio id="a1" src="http://www.freesfx.co.uk/rx2/mp3s/1/1032_1246632309.mp3"></audio><br />
+<br />
+<p>Not with Scala's <a href="http://docs.scala-lang.org/glossary/?_ga=1.76338773.1770564767.1416821369#tail-recursive">Tail Recursion</a> (see also <a href="http://www.scala-lang.org/docu/files/ScalaByExample.pdf">section <em>4.6 Tail Recursion</em> in Marting Ordersky's Scala By Example</a>).<br />
+<br />
+<p>IntelliJ had actually warned me of this with its corkscrew- and refresh-like annotations in the left-hand gutter; here's the factorial implementation from Scala By Example and a tail-recursive version suggested there as an exercise:<br />
+<br />
+<div class="separator" style="clear: both; text-align: center;"><a href="http://3.bp.blogspot.com/-WOa-WEWHdNw/VL1cX4tx_8I/AAAAAAAAAQk/l3CHTQAjpwc/s1600/scala-tail-recursion.jpg" imageanchor="1" ><img border="0" src="http://3.bp.blogspot.com/-WOa-WEWHdNw/VL1cX4tx_8I/AAAAAAAAAQk/l3CHTQAjpwc/s1600/scala-tail-recursion.jpg" /></a><br />
+</div><br />
+And again with the tooltips...<br />
+<br />
+<div class="separator" style="clear: both; text-align: center;"><a href="http://3.bp.blogspot.com/-EIP3xN81jJk/VL1fC18pGqI/AAAAAAAAAQw/u3bBf7NzRzc/s1600/scala-tail-recursion-rec.jpg" imageanchor="1"><img border="0" src="http://3.bp.blogspot.com/-EIP3xN81jJk/VL1fC18pGqI/AAAAAAAAAQw/u3bBf7NzRzc/s1600/scala-tail-recursion-rec.jpg" /></a><br />
+</div><br />
+.. and<br />
+<br />
+<div class="separator" style="clear: both; text-align: center;"><a href="http://1.bp.blogspot.com/-INNYPritnUs/VL1fC-9p1CI/AAAAAAAAAQs/f44u9LvU1CU/s1600/scala-tail-recursion-tail-rec.jpg" imageanchor="1"><img border="0" src="http://1.bp.blogspot.com/-INNYPritnUs/VL1fC-9p1CI/AAAAAAAAAQs/f44u9LvU1CU/s1600/scala-tail-recursion-tail-rec.jpg" /></a><br />
+</div><br />
+Yet in the context and scope of <code>WithMethod.in(testFun:TestFunction)</code>, I couldn't understand why IntelliJ was giving the warning and why execution was getting stuck in a loop<br />
+<br />
+<p>I thought I was delegating to the original implementation, but then I recalled seeing that <code>ResultOfStringPassedToVerb</code> does not define a method <code>in(...)</code> - there's no original implementation to be delegated to.<br />
+<br />
+<p>Rather the extension method <code>in(...)</code> is defined in <code>FlatSpecLike.InAndIgnoreMethods</code>, like so:<br />
+<br />
+<pre class="brush: scala">protected final class InAndIgnoreMethods(resultOfStringPassedToVerb: ResultOfStringPassedToVerb) {
+
+  ...
+
+    def in(testFun: FixtureParam => Any) {
+      registerTestToRun(verb.trim + " " + rest.trim, List(), "in", testFun)
+    }
+
+    ...
+  }
+</pre><br />
+... and the enclosing trait defines a conversion function:<br />
+<br />
+<pre class="brush: scala">trait FlatSpecLike extends Suite with TestRegistration with ShouldVerb with MustVerb with CanVerb ... { thisSuite =>
+
+  ...
+
+  protected implicit def convertToInAndIgnoreMethods(resultOfStringPassedToVerb: ResultOfStringPassedToVerb) =
+    new InAndIgnoreMethods(resultOfStringPassedToVerb)
+
+  ...
+}
+</pre><br />
+Then the penny dropped that, although I had not intended it, the <code>in(testFun:TestFunction)</code> method from <code>WithMethod</code> was also being used as an extension method on <code>ResultOfStringPassedToVerb</code>.<br />
+<br />
+<p>The implicit method <code>convertToInAndIgnoreMethods(resultOfStringPassedToVerb: ResultOfStringPassedToVerb)</code> was still in (implicit lookup) scope from the executing (target) type's methods.<br />
+<br />
+<a name="Restricting Implicit Methods"><h2>Restricting Implicit Methods</h2></a><br />
+<br />
+There are two solutions for this that I tried out (there maybe more):<br />
+<br />
+<ul><li>Hide the implicit method you don't want in the scope where you don't want it</li>
+<li>Define the target of the conversion as a trait, with only the desired method declared, but return an instance of a class extending/with that trait</li>
+</ul><br />
+<br />
+<h5>Hiding In Scope</h5><br />
+The idea here is, once <code>withMethod(method:String)</code> is called we are in the scope of the (renamed) <code>WithMethodHideIn</code> class and no longer want any methods in that class to be used as extension methods.<br />
+<br />
+<p>So we define a NO-OP conversion implementation to hide the one defined earlier, thus unhiding the conversion function in <code>FlatSpecLike.InAndIgnoreMethods</code>:<br />
+<br />
+<pre class="brush: scala">protected final class WithMethodHideIn(resultOfStringPassedToVerb:ResultOfStringPassedToVerb) {
+    
+        // Hide conversion methods within target type; prevent infinite recursion
+        @inline implicit def convertToWithMethods(d:Double):Unit = ()
+
+        ...
+    }
+</pre><br />
+If you are using IntelliJ, you'll notice that the tail-recursion annotation is no longer shown.<br />
+<br />
+<p>The earlier defined conversion method is still exposed outside of the <code>WithMethodHideIn</code> class, so it's not the case that the first test works and subsequent tests fail; they all run green.<br />
+<br />
+<h5>Hide Behind a Trait</h5><br />
+This approach uses a trait to expose the method i.e. <code>withMethod(method: String)</code> needed to extend the source of the conversion i.e. the <code>ResultOfStringPassedToVerb</code> class:<br />
+<br />
+<pre class="brush: scala">trait WithMethod[T <: WithMethod[_]] {
+
+        def withMethod(method:String):T
+    }
+</pre>
+Due to the way traits and case classes are implemented i.e. without the use of the <code>new</code> keyword for instantiation, it's ambiguous when you are invoking the constructor or actually just referring to the type (...maybe that's just my Java <em>wisdom</em> not porting very well to Scala). Either way, using the wildcard type here appeases the compiler and indeed, we do not care about the type in the upper-bound; we just want to allow <a href="https://twitter.github.io/scala_school/type-basics.html">covariant</a> return turn types in subclasses
+
+<p>(Sub-)classes with this trait must be implemented with an accompanying conversion function:
+
+<pre class="brush: scala">case class WithMethodAndIn(resultOfStringPassedToVerb:ResultOfStringPassedToVerb) extends WithMethod[WithMethodAndIn] {
+
+        private var method:String = _
+
+        def withMethod(method: String):WithMethodAndIn = {
+            this.method = method
+            this
+        }
+
+        def in(testFun:TestFunction) {
+            val tf:TestFunction = (fp:FixtureParam) => {
+                val mfp:MethodFixtureParam = fp.asInstanceOf[MethodFixtureParam]
+                assert(method != null)
+                testFun(mfp.build(method))
+            }
+
+            resultOfStringPassedToVerb.in(tf)
+        }
+    }
+
+    @inline implicit def convertToWithMethodAndIn(resultOfStringPassedToVerb:ResultOfStringPassedToVerb):WithMethod[WithMethodAndIn] =
+        WithMethodAndIn(resultOfStringPassedToVerb)
+</pre>This conversion function must have a restricted return type i.e. <code>WithMethod[WithMethodAndIn]</code> and not <code>WithMethodAndIn</code>. This ensures that the latter's <code>in(testFun:TestFunction)</code> method is not exposed as an extension method on <code>ResultOfStringPassedToVerb</code> and therefore does not trigger the conversion function.
+
+<h2>Conclusions</h2>At the time of writing, I am still mulling over which approach I think is best. I am too new to Scala to really know what is good practice and what isn't.
+
+<p>So I welcome comments and feedback to help me with this decision :D

@@ -1,0 +1,104 @@
+---
+layout: post
+title: 'Load Testing with JMeter, Part 3: Load Profiling: Two Ways To Stress The SUT'
+date: '2009-04-17T09:38:00.018+01:00'
+author: Darren Bishop
+tags: 
+modified_time: '2009-04-24T13:33:45.277+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-4949292437823864670
+---
+
+<h3>Welcome back to my series on load testing with JMeter</h3>
+<p>
+The series so far:
+<dl>
+<dt><a href="" target="_blank">The Basics &amp; The System Under Test</a>:
+<dd>xxx
+<dt><a href="" target="_blank">Workflows: Capture, Analysis &amp; Implementation</a>:
+<dd>xxx
+<dt><i><b>Load Profiling: Two Ways To Stress The SUT</b></i>
+<dt>Distributed Load Testing
+<dt>Monitoring The Health Of Your Application Server
+</dl>
+</p>
+
+<h4>Simulating The Load</h4>
+<p>
+There are two approaches that I have used to design JMeter tests: Server-Simulator and User-Simulator
+</p>
+
+<h4>Crunching the Numbers</h4>
+<p>
+<h5>Privamary Varibles:</h5>
+<hr />
+<dl>
+<dt>EE = Experiment Extent
+<dd>???
+
+<dt>ES = Experiment Session
+<dd>???
+
+<dt>UP = User Population
+<dd>???
+
+<dt>US = User Session
+<dd>???
+
+<dt>UR = User Requests
+<dd>???
+
+<dt>TS = Test Servers
+<dd>???
+</dl>
+
+<h5>Secondary Variables:</h5>
+<hr />
+<dl>
+<dt>TU = Users per Test Server; UP / TS
+<dd>???
+
+<dt>UL = User Load; UR / US
+<dd>???
+
+<dt>AR = Arrival Rate; UP / ES
+<dd>???
+</dl>
+
+<h5>Tertiary Variables:</h5>
+<hr />
+<dl>
+<dt>SC = Server Concurrency; AR x US
+<dd>???
+</dl>
+
+<h5>Quaternary Variables:</h5>
+<hr />
+<dl>
+<dt>SL = Server Load; UL x SC
+<dd>???
+</dl>
+</p>
+
+<4>The Through Simulator</h4>
+<p>
+A throughput simulator approach is used to stress test the CTP system. It is based on the idea that the throughput is the only parameter that must remain constant across client (JMeter) and server (CTP). Thus the test infrastructure must provably be able to produce this amount of load. Also this approach makes a few assumptions on the system under test. In particular the mean time between requests must be known and is expected to be stable i.e. with low variance. This time will include server latency, but will typically be bound by user ‘processing’ times. For this reason this ap-proach is sensitive to the user session length. To elaborate, consider the following equation:
+•	SC = SL / UL
+o	SL, the target throughout/load on the server
+o	UL, the load produce per user i.e. UR / US
+	UR, user requests per session
+	US, user session length
+Therefore,
+•	SC = SL x UR / US
+Changing the number of user requests in a user session might semantically alter the workflow. This in turn could invali-date the state-machine of the application, which has the potential to introduce functional error and/or livelock condi-tions. 
+So if we alter the length of the user session i.e. make it much shorter, we will significantly reduce the number of user-managing-threads. These threads are distinguish from user-threads as the latter exist on a one-to-one thread-to-user basis; A single user-managing-thread can process any given number of users, albeit one after the other.
+This approach may have the disadvantage of losing fidelity in user behaviour, but it provides two major benefits: much less threads are used, causing a smaller memory footprint and much less CPU utilization. Hence a single commodity testing resource is sufficient and much less disruptive. An experiment configured this way can also run indefinitely, due to the user-managing-threads aspect.
+Both approaches will exhibit the same behaviour in the event of server performance degradation: functional errors will show as non-zero percentage errors; server-thread exhaustion will also show as non-zero percentage errors; most other events will manifest as a drop off in the overall throughput.
+</p>
+
+<h4>What's Next</h4>
+<p>
+Next I will go through ...; when it is ready you can read that blog <a href="" target="_blank">here</a>.
+
+Cheers
+</p>
+

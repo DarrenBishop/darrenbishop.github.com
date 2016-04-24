@@ -1,0 +1,36 @@
+---
+layout: post
+title: 'Darren on Flex: Flexins Project Launch'
+date: '2009-02-16T00:35:00.022Z'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- Google
+- Flexmojos
+- Git
+- Maven
+modified_time: '2011-04-05T00:08:58.253+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-8963858371997746762
+blogger_orig_url: http://blog.darrenbishop.com/2009/02/darren-on-flex-flexins-project-launch.html
+---
+
+<h4>I am proud to announce the launch of the Flexins Project!</h4>
+This project is the result of some work I started several months ago. I started looking into ways to leverage Flex's declarative MXML to add extra behaviour to applications (or parts therein), using mixins.
+
+The project's homepage is over at <a href="https://sites.google.com/site/flexinsproject/Home">Flexins Project @ Google Sites</a>. It's in flux at the moment as I'm still getting my bearings in administering the site; please bare with me on that one.
+
+The source code is hosted at <a href="http://github.com/DarrenBishop/flexinsproject/tree/master">Flexins Project @ Github</a>. I decided to give Git a spin on this project as it appears to be the emerging SCM of choice for open/public projects.
+
+<h4>So what's it all about?</h4>
+We are all familiar with includes, which work for both <code>.as</code> and <code>.mxml</code> files. This supports the <i>code-behind</i> style, which is a very useful separation mechanism when dealing with complex UI logic or copious event handler code. However, as a mechanism it is pretty stupid, relying only on assumption that internal dependencies (e.g. property existence) are satisfied.
+
+Of course, one can declare interfaces in <code>.mxml</code> and implement them in <code>.as</code> code-behind; I suppose this is the standard approach. The syntactical interface declaration (think: compiler) here also serves to declare (the availability of) any relevant behaviour (think: application feature) [Mixins are not necessarily or typically used this way, to add application features, but it is nonetheless the theme for my initial work]. However, firstly, the interface has to be defined and secondly the include is a waste full source include [Ok, it's debatable the real impact of this on binary size and performance blah blah blah... but from a idealist pov... it's not ideal].
+
+I have found with this new approach to implementing mixins, you can achieve complete separation of responsibility e.g. keeping whatever it is your components are primarily supposed to do, from the behaviour implementation of the mixin. The state required for the mixin to function can be managed internally, negating the need for any interface definitions, declarations or implementations. And because the mixin is not used via a source include, there is only one compiled instance of the code in the binary. Application of the mixin is achieved through <i>normal</i> object-instantiation, not source inclusion everywhere the mixin behaviour is required. 
+
+Another advantage of this new approach is that you do not need access to any source code; you do not need to re-write or extend some existing class in order to bolt on your desired behaviour.
+
+I will blog soon on how all this can be achieved. For now, have a look at an example of what the end result looks like; check out my <a href="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin">Drag'n'Drop Mixin showcase</a>.
+
+Cheers, q(^_^)p

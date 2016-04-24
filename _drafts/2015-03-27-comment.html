@@ -1,0 +1,87 @@
+---
+layout: post
+title: 'Darren on the JVM: Scala: Learning PartialFunctions by Simulating Switch Fall-through'
+date: '2015-03-27T15:22:00.000Z'
+author: Darren Bishop
+tags: 
+modified_time: '2015-03-27T15:22:17.800Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-2086420324163733826
+blogger_orig_url: https://www.blogger.com/comment.g?blogID=3826577489563855618&postID=2086420324163733826
+---
+
+<h2>The Spec</h2><br />
+<pre class="brush: scala">val one: PartialFunction[String, String] = { case "one"|"both" => println("one or both"); "one or both" }
+val two: PartialFunction[String, String] = { case "two"|"both" => println("two or both"); "two or both" }
+one isDefinedAt "one"
+one isDefinedAt "two"
+one isDefinedAt "both"
+two isDefinedAt "one"
+two isDefinedAt "two"
+two isDefinedAt "both"
+
+case class AlsoIfDefinedPF[A, B](pfs:List[PartialFunction[A, B]]) extends PartialFunction[A, B] {
+    override def isDefinedAt(x:A):Boolean = {
+        pfs find (_.isDefinedAt(x)) isDefined
+    }
+    override def apply(x:A) = {
+        pfs.toStream.reverse withFilter (_.isDefinedAt(x)) map (_.apply(x)) reduce ((r1:B, r2:B) => r2)
+    }
+    def also(pf:PartialFunction[A, B]):AlsoIfDefinedPF[A, B] ={
+        AlsoIfDefinedPF(pf :: pfs)
+    }
+}
+implicit def pfToAlsoIfDefPF[A, B](pf:PartialFunction[A, B]):AlsoIfDefinedPF[A, B] = {
+
+    AlsoIfDefinedPF(pf :: Nil)
+}
+var both = one also two
+both isDefinedAt "one"
+both isDefinedAt "two"
+both isDefinedAt "both"
+
+both("one")
+both("two")
+both("both")
+def alsoAll[A, B](pfs:PartialFunction[A, B]*):AlsoIfDefinedPF[A, B] = {
+    pfs.tail.foldLeft(pfToAlsoIfDefPF(pfs.head)){ case (pf1: AlsoIfDefinedPF[A, B], pf2: PartialFunction[A, B]) => pf1 also pf2}
+}
+var both2 = alsoAll[String, String] (
+    { case "one"|"both" => println("one or both"); "one or both" },
+    { case "two"|"both" => println("two or both"); "two or both" }
+)
+both2("one")
+both2("two")
+both2("both")
+case class MatchAll[A <: Any](any:A) {
+    def matchAll[B](pfs:PartialFunction[A, B]*):B = {
+        val aidpf:AlsoIfDefinedPF[A, B] = alsoAll(pfs:_*)
+        aidpf apply any
+    }
+}
+implicit def anyToAMatchAll[A <: Any](any:A):MatchAll[A] = {
+    new MatchAll(any)
+}
+
+"one" matchAll (
+    { case "one"|"both" => println("one or both"); "one or both" },
+    { case "two"|"both" => println("two or both"); "two or both" }
+)
+
+"two" matchAll (
+    { case "one"|"both" => println("one or both"); "one or both" },
+    { case "two"|"both" => println("two or both"); "two or both" }
+)
+
+"both" matchAll (
+    { case "one"|"both" => println("one or both"); "one or both" },
+    { case "two"|"both" => println("two or both"); "two or both" },
+    { case "three" => println("three"); "three" }
+)
+
+"three" matchAll (
+    { case "one"|"both" => println("one or both"); "one or both" },
+    { case "two"|"both" => println("two or both"); "two or both" },
+    { case "three" => println("three"); "three" }
+)
+
+</pre>

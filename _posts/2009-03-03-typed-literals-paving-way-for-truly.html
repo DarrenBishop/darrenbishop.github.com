@@ -1,0 +1,142 @@
+---
+layout: post
+title: 'Darren on Flex: Typed Literals, Paving The Way For Truly Embedded DSLs'
+date: '2009-03-03T18:48:00.003Z'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- Python
+- C#
+- Personal Thoughts
+- LINQ
+- Ruby
+- DSL
+modified_time: '2011-01-21T08:34:48.125Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-620482512349865782
+blogger_orig_url: http://blog.darrenbishop.com/2008/05/typed-literals-paving-way-for-truly.html
+---
+
+<h3>What are they and what do they have to do with embedded DSLs?</h3>
+
+After undertaking several Fit(Library) framework development projects and listening to various speakers on DSLs at SPA2008 (DSLs clearly being the hype for 2008, or at least at that conference), I started thinking about what DSLs exist and what support we have for them and what support we have for new ones.
+
+We are all familiar with the concept of <em>primitive</em> types and String literals? Having a Java background, things don't get much simpler than that. Those who are now feeling the urge to say something like, "Language X does not have primitive types, everything is an object..." please, pipe down, it doesn't really matter. The important thing to note is that there are types of variable you can define a value for without using the <b>new</b> operator (switch the keyword, operator, construct to suit your language of choice).
+
+<h3>String Literal Abuse...</h3>
+Strings are used to express eeeevverything... well, almost everything: SQL statements, XML fragments/documents and Regular Expressions. Even regular language expressions are made executable by the infamous <code>eval('&lt;string-embedded-language-expressions&gt;')</code> method, where supported. There maybe more types expressable by strings but we will focus on these for now, but if you know of any other interesting cases, I'd be interested to learn of them.
+
+<h3>... Invites String Literal Pain!</h3>
+The pain suffered as result of abusing string literals often goes unnoticed and can be derived, in part, from the fact that they are commonly used to embed full-blown languages, as in the highlighted cases for SQL and XML. While coding in this manner i.e. string-embedding, a benefit of <a href="http://en.wikipedia.org/wiki/Formal_language">formal languages</a> becomes less obvious; these languages have their own set of rules i.e. their formal grammar, that apply as a matter of <i>well-formedness</i>. In fact we completely loose the benefit (real, potential or otherwise) of the well-formedness of these formal languages. In other words, the earliest possible point in time that one can determine for sure that some embedded SQL is correct, or in fact wrong, is when your code hits reality i.e. at run-time. For some poor sods (or fools, depending on your p.o.v.), that could be when an livid customer is ranting and raving about some dodgy transaction that takes too long or doesn't yield the... or when some XML document that is spat out chokes some down stream system, which always has teh effect of upsetting a lot of people.
+
+Let's consider escaping: How annoying does it get when one arrives (worse, has to write) at a ridiculously long regular expression string, let's say in Java. There are so many meta-characters that are frequently used to control the semantics of a RegExp that are escaped with a <b>'\'</b> (backslash) and thus must be doubly escaped in Java. In particular managing the namespace overlap for Java (symbols and characters) strings and embedded RegExp (escape-sequences), none more troublesome than <b>'\n'</b>, which means <i>insert new-line</i> and <i>match new-line</i>, respectively, where the former takes precedence thus breaking the latter. The comprehensibility of escaped backslashes can be argued i.e. you know you are writing Java so you know what '\\\\' means, but what I can almost guarantee is that as the number of escaped-backslashes increases the more likely you are to go boss-eyed, recount them n times and ultimatly write the wrong RegExp before getting it right.
+
+<h3>Ruby's <i>Enhanced</i> String Notation</h3>
+Just as an aside, while we are discussing the use of strings, Ruby is quite extraordinary w.r.t. to how one instantiates strings. I have read that Ruby in someways is designed to mimic the Linux shell e.g. in its creation of strings: <b>'</b> (single-quote) strings are different to <b>"</b> (double-quote) strings. Like in the Linux shell, using the double-quote notation expands referenced varibles; one can inject values from locally (lexically) scoped variables in the literal string value using Ruby's <b>#</b> and <b>{}</b> notation when embebbed in double-quoted strings. For example:
+<pre name="code" class="java">
+a = 2
+puts "the variable a = #{a}"
+</pre>
+This yields <code>The variable a = 2</code>.
+<pre name="code" class="java">
+# ...
+puts 'the variable a = #{a}'
+</pre>
+And this yields <code>The variable a = \#{a}</code>.
+
+There will be plenty programmers out there that are familiar with C's <font style="font-weight: bold;">printf()</font>-family of procedures, where it has features in many post-C languages. String.printf() was introduced in Java 5, leveraging the introduction of varargs.
+
+I was once on a Python project too and grew extremely fond of the overloaded <font style="font-weight: bold;">%</font> String operator; coming from Java, I was quite blown away by that back then.
+
+<h3>Using Strings Responsibly Might Mean Not Using Them At All</h3>
+So it seems that some language authors have felt the pain and reacted appropriatly by introducing <i>real</i> types for these things that might otherwise be embedded in strings. Here are a few cases that I know about; if I've missed any, which I am sure I have, please let me know.
+
+<h4>RegExp - JavaScript, ActionScript, Ruby, <i>Python</i></h4>
+The common syntax for these languages, with the exception of Python, is to use the <b>'/'</b> (forward-slash) as the RegExp delimiter, in exactly the same way single-quotes or double-quotes are used to delimit strings. Foe example:
+<pre name="code" class="java">
+/regular expression/
+</pre>
+JavaScript and ActionScript behave almost the same (in my experience, correct me if I am wrong) which suggests to me this maybe a feature ECMAScript; I am not clued up on ECMAScript directly, so I can only speculate. By 'behave' I mean in reference to the flags you can specify to alter the way the  RegExp processes the target string. For example:
+<pre name="code" class="java">
+/regular expression/gimsx;
+</pre>
+<h4>XML Notation - ActionScript</h4>
+ActionScript overloads the <b>&lt;</b> and <b>&gt;</b> operators to be used as XML delimiters(obvious choice, no?).
+<pre name="code" class="java">
+var tagname:String = "item"; 
+var attributename:String = "id"; 
+var attributevalue:String = "5"; 
+var content:String = "Chicken"; 
+var x:XML = &lt;{tagname} {attributename}={attributevalue}&gt;{content}&lt;/{tagname}&gt;; 
+trace(x.toXMLString())
+    // Output: <item id="5">Chicken</item>
+</pre>
+This was borrowed from the <a href="http://livedocs.adobe.com/flex/3/html/13_Working_with_XML_06.html#118938">Flex 3 Developer Guide</a>. As you can see, you can reference variables inline to construct any part of the XML fragment.
+
+<h4>Binary &amp; Bit Notation - Erlang</h4>
+Erlang has the tidiest notation for bits and bytes I've ever seen... excuse me if this a blatant show of ignorance:
+<pre name="code" class="java">
+Binary = &lt;&lt;98,105,110,97,114,121&gt;&gt;.
+</pre>
+Each comma-separated value represents a byte and so must fall in the inclusive range 0-255. This example shows a 6-byte binary.
+<pre name="code" class="java">
+Binary = &lt;&lt;"binary"&gt;&gt;.
+</pre>
+This happens to be valid Erlang as the patterns match. This second example shows a 6-byte binary represented as a string (ironically) as all byte values represent printable ASCII character codes. The first example is matched as the values specified <i>are</i> the corresponding ASCII character codes for <em>binary</em>. I believe Erlang will prefer to display the string form when possible.
+<pre name="code" class="java">
+B = 98.
+I = 105.
+N = 110.
+A = 97.
+R = 114.
+Y = 121.
+Binary = &lt;&lt;B,I,N,A,R,Y&gt;&gt;.
+</pre>
+Erlang also allows you to reference variables/constants/terms (whatever they are called in Erlang) inline as well.
+
+The bit notation is only a minor variation on this theme.
+<pre name="code" class="java">
+MangledBinary = &lt;&lt;B:4,I:4,N:4,A:4,R:4,Y:4&gt;&gt;.
+</pre>
+The <code>:4</code> says to take the 4 least significant bits, in this case chopping each byte in half, which incidentally still yields a printable binary, but now only 3-bytes long (<code>&lt;&lt;")á)"&gt;&gt;</code>)
+
+<h3>So The Part Relevant to DSLs</h3>
+<h4>LINQ-to-SQL - C#</h4>
+C#'s LINQ-to-SQL, coupled with LINQ Expression (comprehension) syntax, is the closest thing I've seen to an embedded DSL that is strongly typed. That is, you can express a literal and assign it inline to a specialized type, relevant to its domain of use.
+<pre name="code" class="java">
+enum Food { Fruit, Veg }
+
+var fruitAndVeg = {
+    new { Type=Fruit, Name="Apple" },
+    new { Type=Fruit, Name="Banana" },
+    new { Type=Fruit, Name="Cherry" },
+    new { Type=Veg, Name="Artichoke" },
+    new { Type=Veg, Name="Asparagus" },
+    new { Type=Veg, Name="Broccoli" },
+    new { Type=Veg, Name="Carrot" }
+};
+
+from food in fruitAndVeg
+where food.Type == Veg
+where food.Name.StartsWith ("A")
+select food.Name
+</pre>
+This yields <code>Artichoke</code> and <code>Asparagus</code>. While this is not SQL-92 (nor does it actually <em>link</em> to SQL [read: database, although it can]), you can clearly see the resemblance and can therefore immediately identify the comprehension syntax as a query language.
+
+<h3>Make the Tools Do The Work!</h3>
+For those that appreciate type-safety (i.e. those that use [and like] strongly-type languages), compile-time support for these typed literals would come as standard. Typed literals would also permit enhanced IDE support: literal validation; syntax highlighting; code completion (if appropriate). These are not ideas of my own, rather a very brief account of my experience with Visual Studio and LINQ with its comprehension syntax.
+
+The problem is the implementation for this is quite involved and limited to querying <code>IEnumerable</code> type things. AFAIK, there is no general mechanism for providing such a feature, a feature which essentially allows you to extend the syntax of you embedding language e.g. C#. Many text editors provide a mechanism to specify information about your language, so that it can usefully provide syntax highlighting. However what we are getting at with <em>typed literals</em> goes beyond this and really needs to extend the compiler and/or the IDE; I envisage some sort of plugin, that either or both compiler and IDE can understand, which has some sort of <em>Type -> Expression syntax</em> mapping.
+
+But once we've done all this, how far away would we be from the effort to do all this using Bison, Flex, JavaCC, YACC or whatever other parser/compile-generator? I'm willing to bet it would be a similar effort, but what we gain by embedding/inlining, aside form the features and support that the IDE would typically provide, is:
+<ul>
+<li>The opportunity for value injection, as per Ruby strings and ActionScript XML fragments.</li>
+<li>The opportunity to simplify tasks that are typically more painful or less compact in the main language e.g. C# and LINQ.</li>
+<li>The oppurtunity to do all the above where you need it, in the code i.e. not in some external file, thus incurring no maintenance penalty.</li>
+</ul>
+
+Well, that's about all I have to say/muse on the subject.
+
+With closures and dynamic constructs becoming more popular, I wait to see what other developments materialise next in the language space.
+
+Cheers.

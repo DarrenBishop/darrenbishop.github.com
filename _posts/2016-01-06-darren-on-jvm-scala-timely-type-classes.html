@@ -1,0 +1,243 @@
+---
+layout: post
+title: 'Darren on the JVM: Scala: Timely Type-Classes Brings Rails-style Date Arithmetic'
+date: '2016-01-06T08:40:00.000Z'
+author: Darren Bishop
+tags:
+- time
+- chronotime
+- JVM
+- datearithmetic
+- implicitconversion
+- Scala
+- date
+- implicits
+- typeclasses
+- jodatime
+modified_time: '2016-01-08T16:52:29.734Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-1046917112261853923
+blogger_orig_url: http://blog.darrenbishop.com/2016/01/darren-on-jvm-scala-timely-type-classes.html
+---
+
+<p>For those of you who have ever done any Ruby development on Rails super-charged with ActiveRecord (as I recall back from 2008), you would have been blessed with the most intuitive date-arithmetic facility known to programming-man.</p>
+<p>At that time in my life, Java was my main bread-and-butter and I longed for this simplicity… I am sure we all did.</p>
+<p>Why it did not exist was simple: primitives such as <code>int</code> and <code>String</code> had these binary operators, as supported by the Java language, but of course Objects like <code>java.util.Date</code> did not; to get them would obviously require a change to the language, but where would you draw the line? What would be the default <code>java.lang.Object</code> behaviour in a <code>obj1 + obj2 = ???</code> situation?</p>
+<p>Then came a long Scala: read <strong><em>‘…change in the language’</em></strong> becomes <strong><em>‘… change the language’</em></strong></p>
+<h2 class="pagebreak">Writing Without Punctuation</h2>
+<p>Before getting into the main meat of this post, let’s digress for a moment to recall another cool and important feature of Scala.</p>
+<p>We know binary operators in Scala are just single-parameter functions in disguise. So flipping that on its head, we can use single-parameter functions like operators:</p>
+<pre class=" brush: scala">"Scala" concat "Is" concat "The" concat "Bees" concat "Knees"
+</pre>
+<p>is exactly the same as</p>
+<pre class=" brush: scala">"Scala".concat("Is".concat("The".concat("Bees".concat("Knees"))))
+</pre>
+<p>Try them both in <code>sbt console</code></p>
+<p>There are some quirks and special steps to be taken if intermixing alphanumeric characters and symbols in your function names, but you get the gist.</p>
+<p>So basically Scala allows us to remove <em>punctuation</em> around function invocations, when those functions are single-parameter functions; you can still remove the <strong>.</strong> (dot) in invocations of functions with multiple parameters, but the parentheses are still required (…why? Off topic!)</p>
+<p>Now exposing binary operators for what they, it stands to reason they can be overriden… or more importantly, can be defined where once they were not.</p>
+<h2 class="pagebreak"><em>Extension Methods</em> a.k.a. Implicits</h2>
+<p>Extension methods are a language feature I discovered when consulting on a C# project Germany many years ago. I remember thinking how cool they were back then and still think they are awesome now in Scala.</p>
+<p>Other languages support this feature in their own form too: Ruby has monkey-patching and JavaScript has prototype augmentation. I suppose if you are really desperate for this facility in Java, one can introduce Aspects.</p>
+<p>Of course in Scala they are merely an application of implicits, or more accurately, the use of implicit type-conversion.</p>
+<pre class=" brush: scala">// Runnable in 'sbt console'
+import java.util.Date
+
+implicit class SuperfluousDate(date: Date) {
+
+  def someSuperfluousFunction = date.toString
+}
+
+case class UnimaginableDate(date:Date) {
+
+  def someUnimaginableFunction = date.toString
+}
+
+implicit def toTheUnimaginable(date:Date) = UnimaginableDate(date)
+
+val now = new Date
+
+now.someSuperfluousFunction
+
+now.someUnimaginableFunction
+</pre>
+<p>As with C# and Extension Methods, one needs to be careful with how implicit type-conversion is applied, so to preserve the semantic/conceptual/behavioural integrity of the class being extended.</p>
+<h2 class="pagebreak">Type Classes a.k.a. Implicits²</h2>
+<p>Type classes are a powerful feature that allows Scala developers to define an <em>interface</em> to capture the behaviour to be added to a class. That type-class can then be used to declare dependencies and expectations in other classes.</p>
+<p>An out-of-the-box example of this is Scala’s <code>Ordering[T]</code> trait: collections have both <code>min()</code> and <code>max()</code>  functions, for example; they only work for the collection, say of type <code>List[A]</code>, if  there is an implementation of <code>Ordering[A]</code> in implicit scope.</p>
+<p><strong>Note</strong>  type-classes are typically defined as traits and are always parametric, that is, they are defined with a parameter type, <code>[T]</code>; they typically have many - at least one, to be useful - concrete implementations that are case-objects and specify <code>[T]</code>.<br>
+This is a key difference of the application of simple extension methods, which require a concrete class, as above, that is not a case-object and can work without parameter-types.</p>
+<p>The function definitions therein also differ, where it is typical in type-classes to define the first parameter as the <em>this</em> object of the function.</p>
+<pre class=" brush: scala">// ...continued
+trait Chrono[T] {
+
+  def now: T
+  def toMillis(t: T): Long
+  def fromMillis(millis: Long): T
+  def -(t: T, duration: FiniteDuration): T
+  def +(t: T, duration: FiniteDuration): T
+}
+
+implicit case object DateChrono extends Chrono[Date] {
+
+  def now = fromMillis(System.currentTimeMillis())
+  def toMillis(date: Date) = date.getTime
+  def fromMillis(millis: Long) = new Date(millis)
+  def -(date: Date, duration: FiniteDuration): Date = new Date(date.getTime - duration.toMillis)
+  def +(date: Date, duration: FiniteDuration): Date = new Date(date.getTime + duration.toMillis)
+}
+</pre>
+<p>As you can see, the type-class <code>Chrono[T]</code> is parametric in <code>[T]</code> and the concrete case-object  implementation, <code>DateChrono</code>, specifies <code>[T]</code> to be <code>[Date]</code>.</p>
+<p>The usefulness of this is perhaps still not apparent</p>
+<pre class=" brush: scala">// ...continued
+import scala.concurrent.duration.{FiniteDuration, DAYS}
+
+val later = DateChrono.+(now, FiniteDuration(10, DAYS))
+
+later.someUnimaginableFunction
+</pre>
+<h2 class="pagebreak">Implicits * (1 + Implicits)</h2>
+<p>Now we combine the basic implicits, as used to implement extensions methods, with the advanced implicits, to define type-classes, to give us the ActiveRecord-style data-arithmetic  sugary goodness</p>
+<pre class=" brush: scala">// ...continued
+implicit class ChronoArithmetic[T](t: T)(implicit ev: Chrono[T]) {
+
+  def plus(duration: FiniteDuration) = ev.+(t, duration)
+  def +(duration: FiniteDuration) = plus(duration)
+  def minus(duration: FiniteDuration) = ev.-(t, duration)
+  def -(duration: FiniteDuration) = minus(duration)
+}
+
+now + FiniteDuration(10, DAYS)
+</pre>
+<p>and more sugar</p>
+<pre class=" brush: scala">// ...continued
+val days20 = FiniteDuration(20, DAYS)
+
+now + days20
+</pre>
+<p>and yet more SUGGGAAAARRR</p>
+<pre class=" brush: scala">// ...continued
+import scala.concurrent.duration._
+
+now + 30.days
+</pre>
+<p>How cool is that!</p>
+<p>Perhaps there was a bit of a leap there: deciphering <code>ChronoArithmetic</code>, it offers an implicit conversion of instances of type <code>[T]</code> but only where there is an implementation of <code>Chrono[T]</code> available in implicit scope.</p>
+<p>It doesn’t end there…</p>
+<h2 class="pagebreak">Testing With ChronoTime</h2>
+<p>Now you may wonder how this applies to testing: have you ever been in the situation where you wanted to set when <strong><em>now</em></strong> is?</p>
+<p>Say in a batch of time sensitive tests, by virtue of covering time sensitive production code, where you must have the test code and the production code reliably agree on when <em>now</em> is, down to the microsecond.</p>
+<p>You can’t monkey around with the system time as that will break with parallelized testing… and probably break a whole bunch of other things.</p>
+<p><a href="http://www.joda.org/joda-time/">Joda-Time</a> offers a mechanism to do this with <a href="http://www.joda.org/joda-time/apidocs/org/joda/time/DateTimeUtils.html#setCurrentMillisFixed-long-">DateTimeUtils.setCurrentMillisFixed(long)</a>, made thread-safe with <a href="http://www.joda.org/joda-time/apidocs/org/joda/time/DateTimeUtils.html#setCurrentMillisProvider-org.joda.time.DateTimeUtils.MillisProvider-">DateTimeUtils.setCurrentMillisProvider(DateTimeUtils.MillisProvider millisProvider)</a> … which is cool if you are already using Joda-Time and can ensure that all past and future requests for the current time is made via <a href="http://www.joda.org/joda-time/apidocs/org/joda/time/DateTimeUtils.html#currentTimeMillis--">DateTimeUtils.currentTimeMillis()</a> and not the typical <a href="http://docs.oracle.com/javase/8/docs/api/java/lang/System.html?is-external=true#currentTimeMillis--">System.currentTimeMillis()</a>.</p>
+<p>An old colleague of mine faced this exact problem and enhanced the implementation with a clock!</p>
+<pre class=" brush: scala">// ...continued
+trait Clock {
+  def millis: Long
+}
+</pre>
+<p>Now this is essentially the same as <a href="http://www.joda.org/joda-time/apidocs/org/joda/time/DateTimeUtils.MillisProvider.html">DateTimeUtils.MillisProvider</a>. Originally, the API was updated such that an instance of this <code>Clock</code> was <em>explicitly</em> passed around wherever <em>now</em> was needed.</p>
+<pre class=" brush: scala">// ...continued... but hold off pasting this in
+trait Chrono[T] {
+  def now(clock: Clock) = fromMillis(clock.millis)
+  ...
+}
+
+def rightNow[T](clock: Clock)(implicit ev: Chrono[T]): T = ev.now(clock)
+</pre>
+<p>It seemed a shame to litter the API with the introduction of this new <code>Clock</code> class, but that was easily remedied by making it implicit also.</p>
+<pre class=" brush: scala">// ...continued... go ahead and paste this in (update Chrono[T])
+trait Chrono[T] {
+  def now(implicit clock: Clock) = fromMillis(clock.millis)
+  ...
+}
+
+def rightNow[T](implicit ev: Chrono[T], clock: Clock): T = ev.now
+</pre>
+<p>The implementation of <code>now(...)</code> is now (ha) completed provided by <code>Chrono[T]</code>; it is no longer an abstract method and can be removed from all type-classes, such as <code>DateChrono</code>.</p>
+<p>Notice how implicit parameters are automatically in implicit scope for invocations made inside the function body; this has the effect that implicit parameters get passed along.</p>
+<p>Another quick digression to bring to mind another cool feature of Scala and application of it.</p>
+<h4 id="have-your-slice-of-cake">Have Your Slice of Cake</h4>
+<p>In Scala, it is very common to implement the <a href="http://jonasboner.com/2008/10/06/real-world-scala-dependency-injection-di/">Cake pattern</a> and compose the execution environment with layers, whether that be the production execution environment or the test execution environment.</p>
+<p>The Cake pattern is made possible by Scala’s Traits language feature.<br>
+In some ways Scala Traits are similar to Aspects in Java. That said, I have only ever seen Aspects used to augment behaviour; Scala Traits can mixin behaviour <em>AND</em> mixin state - the latter along with Scala’s <code>self-type</code> are utilised in implementing the Cake pattern.</p>
+<p>The Cake pattern and layering is really beneficial in that it provides an environment and object-graph that is type-checkable at compile-time; compare that to the dynamic nature of Spring-powered dependency-injection – you know if the Scala + Cake compiles, all dependencies are satisfied.</p>
+<h4 id="execution-environments">Execution Environments</h4>
+<p>Lets introduce a <code>Clock</code> implementation that defers to the system time</p>
+<pre class=" brush: scala">// ...continued
+trait ClockProvider {
+
+  implicit val clock: Clock
+}
+
+case object SystemClock extends Clock {
+  def millis = {
+    System.currentTimeMillis
+  }
+}
+
+trait SystemClockProvider extends ClockProvider {
+
+  implicit val clock = SystemClock
+}
+</pre>
+<p>This implementation can be used to compose an object graph in a production environment</p>
+<pre class=" brush: scala">// ...continued
+class Main extends SystemClockProvider {
+  self: ClockProvider =&gt;
+
+  val now: Date = rightNow[Date]
+}
+
+val then = new Main().now
+
+val later = then + 20.days
+</pre>
+<p>For testing, we can provide an alternate implementation that always returns the same value</p>
+<pre class=" brush: scala">// ...continued
+class Production(implicit clock: Clock) {
+
+  println(clock.getClass)
+  
+  def get5SecondsLater = rightNow[Date] + 5.seconds
+}
+
+case object FixedClock extends Clock {
+  def millis = {
+    0 // since Unix Epoch, 1st January 1970
+  }
+}
+
+class FixedClockTest extends FixedClockProvider {
+  self: ClockProvider =&gt;
+  
+  val later5Seconds = rightNow[Date] + 5.seconds
+  
+  val prod = new Production
+
+  assert(prod.get5SecondsLater == later5Seconds, "FAIL")
+}
+
+new FixedClockTest
+</pre>
+<p>Here’s a negative test using the <code>SystemClock</code></p>
+<pre class=" brush: scala">// ...continued
+class SystemClockTest extends SystemClockProvider {
+  self: ClockProvider =&gt;
+  
+  val later5Seconds = rightNow[Date] + 5.seconds
+  
+  println("Sleeping...")
+  
+  Thread.sleep(5000)
+  
+  val prod = new Production
+
+  val prodLater = prod.get5SecondsLater
+  
+  assert(prodLater != later5Seconds, "FAIL")
+}
+
+new SystemClockTest
+</pre>
+<p>That’s about it.</p>
+<h2 class="pagelinks"></h2>
+<p>Feel free to copy paste from here; there is now also a Gist including a ScalaTest spec available <a href="https://gist.github.com/DarrenBishop/25d472722614786accf2">here</a></p>

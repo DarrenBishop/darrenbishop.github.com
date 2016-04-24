@@ -1,0 +1,97 @@
+---
+layout: post
+title: 'Darren on Flex: Overloading the Constructor - Revisted'
+date: '2008-09-22T20:38:00.008+01:00'
+author: Darren Bishop
+tags: 
+modified_time: '2008-10-16T10:31:26.832+01:00'
+thumbnail: http://2.bp.blogspot.com/_Q_F_ea5EKi0/SNgDXWOuHiI/AAAAAAAAADk/jZ3BXp9BZIk/s72-c/ScreenHunter_01+Sep.+22+21.42.jpg
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-7772317346601653485
+blogger_orig_url: http://blog.darrenbishop.com/2008/09/its-not-personal-darren-on-flex.html
+---
+
+This is just a follow up to <a href="http://workingwithmrb.blogspot.com/2008/09/darren-on-flex-overloading-constructor.html">Overloading the Constructor</a> to elaborate on my <a href="http://workingwithmrb.blogspot.com/2008/09/darren-on-flex-overloading-constructor.html?showComment=1222116420000#c898584664317119191">response</a> to a comment made by <a href="http://21ccw.blogspot.com">Ben</a>. I show how to:<ul>
+<li>Hide the public constructor by hiding the implementation class.</li>
+<li>Expose the class via an interface.</li>
+<li>Provide arbitrary factory methods in a factory class.</li>
+</ul><h4>The Interface</h4><pre name="code" class="js:nogutter">
+//example\IPerson.as
+package example {
+    public interface IPerson {
+        function get fullName():String
+    }
+}
+</pre><h4>The Factory and Implementation Class</h4><pre name="code" class="js:nogutter">
+//example\PersonFactory.as
+package example {
+    public class PersonFactory {  
+        public function newPersonWithFirstName(firstName:String):Person {
+            return new Person({firstName: firstName});
+        }  
+        
+        public function newPersonWithLastName(lastName:String):Person {
+            return new Person({lastName: lastName});
+        }  
+        
+        public function newPersonWithFirstAndLastName(firstName:String, lastName:String):Person {
+            return new Person({firstName: firstName, lastName: lastName});
+        }  
+        
+        public function someDudeWithOnlyMiddleNames(... middleNames):Person {
+            return new Person({middleNames: middleNames});
+        }
+        
+        public function andTheFullShaBang(firstName:String, lastName:String, ... middleNames):Person {
+            return new Person({firstName: firstName, middleNames: middleNames, lastName: lastName});
+        }
+    }
+}
+
+import example.IPerson;
+
+class Person implements IPerson {
+    private var firstName:String;
+    private var lastName:String;
+    private var middleNames:Array;
+    
+    public function get fullName():String {
+        return firstName + (middleNames ? " " + middleNames.join(" ") + " ": " ") + lastName;
+    }
+    
+    public function Person(params:Object) {
+        for (var property:String in params) {
+            this[property] = params[property];
+        }
+    }
+}  
+</pre><h4>The FlexUnit Test (for good measure)</h4><pre name="code" class="js:nogutter">
+//example\PersonFactoryTest .as
+package example {
+    import flexunit.framework.TestCase;
+
+    public class PersonFactoryTest extends TestCase {
+        public function PersonFactoryTest(methodName:String=null) {
+            super(methodName);
+        }
+        
+        public function testCreatingBenjaminNortier():void {
+            var factory:PersonFactory = new PersonFactory();
+            
+            var ben:IPerson = factory.newPersonWithFirstAndLastName("Benjamin", "Nortier");
+            
+            assertEquals("Benjamin Nortier", ben.fullName);
+        }
+        
+        public function testCreating21stCenturyCodeWorks21ccwblogspotcomBenjaminNortierWith():void {
+            var factory:PersonFactory = new PersonFactory();
+            
+            var ben:IPerson = factory.andTheFullShaBang("Benjamin", "Nortier", "21st Century Code Works", "21ccw.blogspot.com");
+            
+            assertEquals("Benjamin 21st Century Code Works 21ccw.blogspot.com Nortier", ben.fullName);
+        }
+    }
+}
+</pre>... and the results snapshot:
+<a onblur="try {parent.deselectBloggerImageGracefully();} catch(e) {}" href="http://2.bp.blogspot.com/_Q_F_ea5EKi0/SNgDXWOuHiI/AAAAAAAAADk/jZ3BXp9BZIk/s1600-h/ScreenHunter_01+Sep.+22+21.42.jpg"><img style="display:block; margin:0px auto 10px; text-align:center;cursor:pointer; cursor:hand;" src="http://2.bp.blogspot.com/_Q_F_ea5EKi0/SNgDXWOuHiI/AAAAAAAAADk/jZ3BXp9BZIk/s400/ScreenHunter_01+Sep.+22+21.42.jpg" border="0" alt=""id="BLOGGER_PHOTO_ID_5248949065339510306" /></a>
+
+Cheers

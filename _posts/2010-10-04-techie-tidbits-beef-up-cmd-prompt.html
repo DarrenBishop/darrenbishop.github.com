@@ -1,0 +1,71 @@
+---
+layout: post
+title: 'Techie Tidbits: Beef up the CMD Prompt'
+date: '2010-10-04T01:47:00.004+01:00'
+author: Darren Bishop
+tags:
+- Bash
+- Python
+- Tidbits
+- Perl
+- Cygwin
+- Ruby
+- CMD
+modified_time: '2010-10-10T20:11:10.555+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-8608086113267078913
+blogger_orig_url: http://blog.darrenbishop.com/2010/10/techie-tidbits-beef-up-cmd-prompt.html
+---
+
+Are you a frequent Cygwin user and/or often ask yourself "Why is the CMD prompt so crap?!"? If so, you'll probably be interested to know how you can inject some or possibly all of that Linux/Bash goodness into your CMD prompt.
+
+<h5>1st, <a href="http://blog.darrenbishop.co.uk/2010/10/techie-tidbits-get-going-with-cygwin.html">Install Cygwin</a> if you haven't already done so</h5>
+
+<h5>2nd, Extend Your <code>PATH</code></h5>
+Create a <code>bin</code> (short for binary, but conventionally the home for anything executable) folder in your user directory, then add this directory to your <code>PATH</code> variable: <em>Win+Pause > Advanced Settings > Environment Variables</em>, probably best to add it to <em>User variables for &lt;You&gt;</em>
+
+<h5>3rd, Create Your Associations</h5>
+I've made an <code>associations.cmd</code> file in my personal <code>bin</code> directory with the following contents:
+<pre class="brush: bash">
+@echo off
+
+assoc .sh=BashScript
+ftype BashScript="C:\Cygwin\bin\env.exe" "CYGWIN=nodosfilewarning" "/bin/bash" -l "%%1" %%*
+
+assoc .pl=PerlScript
+ftype PerlScript="C:\Cygwin\bin\env.exe" "CYGWIN=nodosfilewarning" "/bin/perl" "%%1" %%*
+
+assoc .py=PythonScript
+ftype PythonScript="C:\Dev\Python\2.6(x86)\python.exe" "%%1" %%*
+
+assoc .rb=RubyScript
+ftype RubyScript="C:\Dev\Ruby\1.8.6\bin\ruby.exe" "%%1" %%*
+</pre>
+
+Clearly I have Python and Ruby installed on Windows - if you don't omit the last and second to last command pairs. If you have installed the Perl package in Cygwin (which I recommend you do), then the second pair of commands wires that up. Now run this CMD file.
+
+<h5>4th, Extend Your <code>PATHEXT</code></h5>
+Follow the instructions in step 2, but instead of changing the <code>PATH</code> variable, add the Bash, Python and Perl script file extensions (SH, PY and PL, respectively) to the semi-colon separated <code>PATHEXT</code> variable
+
+<p>
+This now allows you to run any Bash, Python or Perl script from anywhere on the CMD Prompt, JOY!
+
+<h5>A Perl Example</h5>
+Create <code>prename.pl</code> in your personal <code>bin</code> directory with the following contents:
+<pre class="brush: perl">
+#!/usr/bin/perl -w
+
+$op = shift or die "Usage: rename expr [files]\n";
+chomp(@ARGV = <STDIN>) unless @ARGV;
+for (@ARGV) {
+    $was = $_;
+    eval $op;
+    die $@ if $@;
+    rename($was,$_) unless $was eq $_;
+}
+</pre>
+
+<p>
+Now if you have a file called <code>file_123.txt</code> and you wanted to rename it to <code>file_abc.txt</code>, you could run the following in a CMD Prompt:
+<pre class="brush: bash">
+prename "s,\d+,abc," file*
+</pre>

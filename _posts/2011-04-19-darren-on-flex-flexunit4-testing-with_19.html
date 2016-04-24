@@ -1,0 +1,279 @@
+---
+layout: post
+title: 'Darren on Flex: FlexUnit4 Testing with Parsley - Hiding Fluint Sequences with
+  a Flow-based DSL'
+date: '2011-04-19T00:38:00.005+01:00'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- TDD
+- Agile
+- FlexUnit
+- FlashBuilder
+- Parsley
+- Flexmojos
+- DSL
+- Testing
+modified_time: '2011-06-17T07:33:33.946+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-539138875067178983
+blogger_orig_url: http://blog.darrenbishop.com/2011/04/darren-on-flex-flexunit4-testing-with_19.html
+---
+
+In <a href="/2011/04/darren-on-flex-flexunit4-testing-with_17.html">Part-2</a> I showed how to implement a component-test, with some of the setup delegated to Parsley to leverage IoC and DI.
+
+<p>
+In Part-3, I'll show how to hide the Fluint Sequence API, used for asynchronous testing, behind an embedded asynchronous-DSL. The DSL design presented only really serves to seed an idea; anyone can implement a DSL, using different verb-names for methods and statement construction.
+
+<h2>The 'test' code re-revisted...</h2>
+<pre class="brush: as3">
+package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.GetPersonCommandComponentTestContext;
+    import com.darrenbishop.crm.directory.domain.Person;
+    import com.darrenbishop.support.create;
+    import com.darrenbishop.support.flexunit.async.AsyncHelper;
+    
+    import flash.events.ErrorEvent;
+    import flash.events.EventDispatcher;
+    
+    import org.flexunit.assertThat;
+    import org.hamcrest.object.equalTo;
+    import org.spicefactory.parsley.core.context.Context;
+    import org.spicefactory.parsley.core.messaging.MessageProcessor;
+    import org.spicefactory.parsley.flex.FlexContextBuilder;
+    
+    public class GetPersonCommandDSLComponentTest extends AsyncHelper {
+        [MessageDispatcher]
+        public var dispatcher:Function;
+        
+        [Inject]
+        public var context:Context;
+        
+        [Inject]
+        public var service:StubDirectoryService;
+        
+        [Inject]
+        public var command:GetPersonCommand;
+        
+        public var dodgyPerson:Person;
+        
+        public var soundPerson:Person;
+        
+        private var eventDispatcher:EventDispatcher;
+        
+        [Before]
+        public function initializeContext():void {
+            var ctx:Context = FlexContextBuilder.build(GetPersonCommandComponentTestContext);
+            ctx.createDynamicContext().addObject(this);
+            
+            eventDispatcher = new EventDispatcher();
+            
+            dodgyPerson = create(Person, {'id': 1, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6803225});
+            soundPerson = create(Person, {'id': 2, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168});
+            
+            service.add(dodgyPerson, soundPerson);
+            
+            service.dodgyPerson = dodgyPerson.id;
+            service.soundPerson = soundPerson.id;
+        }
+        
+        [After]
+        public function destroyContext():void {
+            context.destroy();
+            eventDispatcher = null;
+        }
+        
+        [MessageError(type='com.darrenbishop.crm.directory.application.PersonEvent')]
+        public function rethrowIt(processor:MessageProcessor, error:Error):void { 
+            eventDispatcher.dispatchEvent(toEvent(error));
+        }
+        
+        [MessageHandler(selector='PersonEvent.found')]
+        public function passItOn(event:PersonEvent):void {
+            eventDispatcher.dispatchEvent(event);
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler does not mangle the person found.')]
+        public function resultDoesNotManglePersonFound():void {
+            dispatcher(PersonEvent.newLookup(soundPerson.id));
+            waitFor(eventDispatcher, PersonEvent.FOUND, 1000);
+            thenAssert(function(event:PersonEvent, data:*):void {
+                assertThat(event.type, equalTo('PersonEvent.found'));
+                assertThat(event.person.fullname, equalTo('John002 Smith002'));
+            });
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler verifies the id of the person found.')]
+        public function resultVerifiesPersonFound():void {
+            dispatcher(PersonEvent.newLookup(dodgyPerson.id));
+            waitFor(eventDispatcher, ErrorEvent.ERROR, 1000);
+            thenAssert(function(event:ErrorEvent, data:*):void {
+                assertThat(event.text, equalTo(sprintf('Found person (%d) does not match lookup person (%d)', soundPerson.id, dodgyPerson.id)));
+            });
+        }
+    }
+}
+</pre>
+
+Note that the test class now extends <code>AsyncHelper</code>, that is, I use inheritance to provide access to the async-DSL methods. An alternative approach is that adopted by Mockito-Flex, where a global object is used as/to share state between a suite of global functions implementing the mocking-DSL. I believe this is a safe approach as the Flex execution model is <i>'single-threaded'</i>... I might explore this approach and free-up inheritance for local uses.
+
+<p>
+Anyway, my main objective in doing this is to remove any explicit use of the Fluint Sequence API and provide an abstraction that is a bit easier to use and read. To make the refactorings and changes a little more clear, I've provided a diff below generated against the test above and that from <a href="/2011/04/darren-on-flex-flexunit4-testing-with_17.html">Part-2</a>
+
+<pre class="brush: diff">
+--- C:/Dev/workspaces/flex/parsley-flexunit/src/test/flex/com/darrenbishop/crm/directory/application/GetPersonCommandComponentTest.as Fri Jun 17 07:26:56 2011
++++ C:/Dev/workspaces/flex/parsley-flexunit/src/test/flex/com/darrenbishop/crm/directory/application/GetPersonCommandDSLComponentTest.as Fri Jun 17 07:23:37 2011
+@@ -4,2 +4,3 @@
+     import com.darrenbishop.support.create;
++    import com.darrenbishop.support.flexunit.async.AsyncHelper;
+     
+@@ -9,4 +10,2 @@
+     import org.flexunit.assertThat;
+-    import org.fluint.sequence.SequenceRunner;
+-    import org.fluint.sequence.SequenceWaiter;
+     import org.hamcrest.object.equalTo;
+@@ -16,3 +15,3 @@
+     
+-    public class GetPersonCommandComponentTest {
++    public class GetPersonCommandDSLComponentTest extends AsyncHelper {
+         [MessageDispatcher]
+@@ -35,5 +34,3 @@
+         
+-        private var sequence:SequenceRunner;
+-        
+-        [Before(async)]
++        [Before]
+         public function initializeContext():void {
+@@ -44,4 +41,2 @@
+             
+-            sequence = new SequenceRunner(this);
+-            
+             dodgyPerson = create(Person, {'id': 1, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6803225});
+@@ -59,8 +54,7 @@
+             eventDispatcher = null;
+-            sequence = null;
+         }
+-
++        
+         [MessageError(type='com.darrenbishop.crm.directory.application.PersonEvent')]
+         public function rethrowIt(processor:MessageProcessor, error:Error):void { 
+-            eventDispatcher.dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, error.message));
++            eventDispatcher.dispatchEvent(toEvent(error));
+         }
+@@ -75,6 +69,4 @@
+             dispatcher(PersonEvent.newLookup(soundPerson.id));
+-            
+-            sequence.addStep(new SequenceWaiter(eventDispatcher, PersonEvent.FOUND, 1000));
+-            
+-            sequence.addAssertHandler(function(event:PersonEvent, data:*):void {
++            waitFor(eventDispatcher, PersonEvent.FOUND, 1000);
++            thenAssert(function(event:PersonEvent, data:*):void {
+                 assertThat(event.type, equalTo('PersonEvent.found'));
+@@ -82,4 +74,2 @@
+             });
+-            
+-            sequence.run();
+         }
+@@ -89,10 +79,6 @@
+             dispatcher(PersonEvent.newLookup(dodgyPerson.id));
+-            
+-            sequence.addStep(new SequenceWaiter(eventDispatcher, ErrorEvent.ERROR, 1000));
+-            
+-            sequence.addAssertHandler(function(event:ErrorEvent, data:*):void {
++            waitFor(eventDispatcher, ErrorEvent.ERROR, 1000);
++            thenAssert(function(event:ErrorEvent, data:*):void {
+                 assertThat(event.text, equalTo(sprintf('Found person (%d) does not match lookup person (%d)', soundPerson.id, dodgyPerson.id)));
+             });
+-            
+-            sequence.run();
+         }
+</pre>
+
+By counting the added (8) and subtracted (14) lines reveals a net reduction by 6 lines - a modest improvement. I could have indulged a bit more and come up with a nice <i>Given, When, Then</i> conforming DSL, but too much thought would have had to go into getting the semantics right, so I defer that for another day.
+
+
+<p>
+The important thing is I have achieved my goal, stated above.
+
+<h5><code>async</code> - refactored</h5>
+
+So as discussed, all the Fluint Sequence usage has been pulled up into the <code>AsyncHelper</code> base class:
+<pre class="brush: as3">
+package com.darrenbishop.support.flexunit {
+    import flash.events.ErrorEvent;
+    import flash.events.Event;
+    import flash.events.EventDispatcher;
+    
+    import mx.events.FlexEvent;
+    
+    import org.fluint.sequence.*;
+
+    public class AsyncHelper {
+        protected var sequence:SequenceRunner;
+        
+        [Before(async)]
+        public function setUpSequence():void {
+            sequence = new SequenceRunner(this);
+        }
+        
+        [After(async)]
+        public function tearDownSequence():void {
+            sequence = null;
+        }
+        
+        // Primitive steps
+        
+        protected function waitFor(dispatcher:EventDispatcher, eventType:String=FlexEvent.VALUE_COMMIT, timeout:Number=100):void {
+            sequence.addStep(new SequenceWaiter(dispatcher, eventType, timeout));
+        }
+        
+        protected function dispatch(dispatcher:EventDispatcher, event:Event):void {
+            sequence.addStep(new SequenceEventDispatcher(dispatcher, event));
+        }
+        
+        protected function assert(handler:Function, passThroughData:*):void {
+            sequence.addAssertHandler(handler, passThroughData);
+        }
+        
+        protected function run():void {
+            sequence.run();
+        }
+        
+        protected function toEvent(error:Error):ErrorEvent {
+            return new ErrorEvent(ErrorEvent.ERROR, false, false, error.message);
+        }
+        
+        // Composite steps
+        
+        protected function thenAssert(handler:Function, passThroughData:*=null):void {
+            assert(handler, passThroughData || {});
+            run();
+        }
+    }
+}
+</pre>
+
+Notice that this test base-class defines setup and teardown behaviour, using <code>[Before]</code> and <code>[After]</code> metadata tags. FlexUnit supports <code>[Before]</code> and <code>[After]</code> inheritance, using an <i>accumulator</i> strategy rather than the standard-OO <i>override</i> strategy:
+<ul>
+<li><code>[Before]</code> annotated methods are applied from the root of the inheritance chain down, prior to a test method invocation
+<li><code>[After]</code> annotated methods are applied from bottom to top
+</ul>
+
+Presumably, this provides symmetry to the setup and teardown of state and fixtures, with each level of inheritance potentially relying on the effects of the levels above.
+
+<p>
+The <code>AsyncHelper</code> class is pretty self explanatory: the <code>[Before]</code> and <code>[After]</code> methods are nothing new - they just manage the existence of the <code>sequence</code> object. The rest of the methods just manipulate the <code>sequence</code> object, but again, in no new ways; they are given verb or verb-phrases for names, thus self-describing what they do.
+
+<p>
+The test author will need to know about these inherited methods to use them - not really a problem these days... we all hit <code>Ctrl+Space</code>, right?
+
+<p>
+The real value in DSLs comes when developers (or even non-developers, if you happen to pair with a QA guy or a BA) who are not the original author of the tests (or whatever) must read them; they will be able to discern the embedded flow/logic/intention/expectation a lot easier.
+
+<h2>What's Next...</h2>
+
+<a href="/2011/04/darren-on-flex-flexunit4-testing-with_20.html"><h5>Part 4: Improved Parsley Support with FlexUnit's <strike><code>[RunWith(...)]</code></strike><code>[Rule]</code></h5></a>
+
+I'll introduce the <code>ParsleyRunner</code>, which facilitates integration of Parsley into FlexUnit testing, using the <code>[RunWith]</code> metadata tag.
+
+Also, with the recent release of FlexUnit 4.1, I'll implement improved Parsley-FlexUnit integration using the <code>[Rule]</code> metadata tag.

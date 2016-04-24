@@ -1,0 +1,357 @@
+---
+layout: post
+title: 'Darren on Flex: FlexUnit4 Testing with Parsley - Improved Parsley Support
+  with FlexUnit''s [RunWith(...)] & [Rule]'
+date: '2011-04-20T18:24:00.005+01:00'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- TDD
+- Agile
+- FlexUnit
+- FlashBuilder
+- Parsley
+- Flexmojos
+- DSL
+- Testing
+modified_time: '2011-06-17T07:37:09.025+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-1645499562548516264
+blogger_orig_url: http://blog.darrenbishop.com/2011/04/darren-on-flex-flexunit4-testing-with_20.html
+---
+
+In <a href="/2011/04/darren-on-flex-flexunit4-testing-with_19.html">Part-3</a> I showed how a DSL can be used to reduce the complexity of asynchronous testing when using the Fluint Sequence API. With this DSL I was also able to remove several lines of boilerplate code. These might be modest improvements, but the introduction of a DSL paves the way for more concise tests.
+
+<p>
+In Part-4, I'll show how to integrate Parsley into FlexUnit by using the <code>[RunWith]</code> and <code>[Rule]</code> hook mechanisms to make FlexUnit do the heavy lifting i.e. context initialization and dependency injection.
+
+<h2>The 'test' code re-re-revisted...</h2>
+
+As mentioned there are two approaches, <code>[RunWith]</code> and <code>[Rule]</code>. I had previously held-back from exploring the <code>[Rule]</code> option as it comes with FlexUnit 4.1, which up until very recently, had only been available in beta. I explore this second option later in this post, but first...
+
+<h5>The <code>[RunWith]</code> approach</h5>
+<pre class="brush: as3">
+package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.GetPersonCommandComponentTestContext;GetPersonCommandComponentTestContext;
+    import com.darrenbishop.support.flexunit.parsley.ParsleyRunner;ParsleyRunner;
+    
+    import org.flexunit.asserts.fail;
+    import flash.events.ErrorEvent;
+    import org.flexunit.assertThat;
+    import org.hamcrest.object.equalTo;
+    import com.darrenbishop.support.create;
+    import com.darrenbishop.crm.directory.domain.Person;
+    import com.darrenbishop.support.flexunit.async.AsyncHelper;
+    import org.spicefactory.parsley.core.context.Context;
+    import flash.events.EventDispatcher;
+    import org.spicefactory.parsley.core.messaging.MessageProcessor;
+    
+    [RunWith('com.darrenbishop.support.flexunit.parsley.ParsleyRunner')]
+    [Context('com.darrenbishop.crm.directory.GetPersonCommandComponentTestContext')]
+    public class GetPersonCommandParsleyRunnerComponentTest extends AsyncHelper {
+        [MessageDispatcher]
+        public var dispatcher:Function;
+        
+        [Inject]
+        public var context:Context;
+        
+        [Inject]
+        public var service:StubDirectoryService;
+        
+        [Inject]
+        public var command:GetPersonCommand;
+        
+        public var dodgyPerson:Person;
+        
+        public var soundPerson:Person;
+        
+        private var eventDispatcher:EventDispatcher;
+        
+        [Before]
+        public function primeService():void {
+            eventDispatcher = new EventDispatcher();
+            
+            dodgyPerson = create(Person, {'id': 1, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6803225});
+            soundPerson = create(Person, {'id': 2, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168});
+            
+            service.add(dodgyPerson, soundPerson);
+            
+            service.dodgyPerson = dodgyPerson.id;
+            service.soundPerson = soundPerson.id;
+        }
+        
+        [MessageError(type='com.darrenbishop.crm.directory.application.PersonEvent')]
+        public function rethrowIt(processor:MessageProcessor, error:Error):void { 
+            eventDispatcher.dispatchEvent(toEvent(error));
+        }
+        
+        [MessageHandler(selector='PersonEvent.found')]
+        public function passItOn(event:PersonEvent):void {
+            eventDispatcher.dispatchEvent(event);
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler does not mangle the person found.')]
+        public function resultDoesNotManglePersonFound():void {
+            dispatcher(PersonEvent.newLookup(soundPerson.id));
+            waitFor(eventDispatcher, PersonEvent.FOUND, 1000);
+            thenAssert(function(event:PersonEvent, data:*):void {
+                assertThat(event.type, equalTo('PersonEvent.found'));
+                assertThat(event.person.fullname, equalTo('John002 Smith002'));
+            });
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler verifies the id of the person found.')]
+        public function resultVerifiesPersonFound():void {
+            dispatcher(PersonEvent.newLookup(dodgyPerson.id));
+            waitFor(eventDispatcher, ErrorEvent.ERROR, 1000);
+            thenAssert(function(event:ErrorEvent, data:*):void {
+                assertThat(event.text, equalTo(sprintf('Found person (%d) does not match lookup person (%d)', soundPerson.id, dodgyPerson.id)));
+            });
+        }
+    }
+}
+</pre>
+
+I declare the <code>ParsleyRunner</code> class as the default attribute to the <code>[RunWith]</code> metadata tag; I import and reference the same (at the top of the excerpt) to ensure the runner is linked in. This highlights one of the fundamental problems with this approach: you must repeat you intention too many times - once should be enough.
+
+<p>
+The same goes for the <code>GetPersonCommandComponentTestContext</code>; the runner needs to be told somehow which Parsley context to initialize. Perhaps there are better ways to communicate to the runner which context to use, with static members maybe, but the problem persists for the runner itself so there's little value in exploring such an enhancement.
+
+<p>
+The only other significant change is the <code>[Before]</code> annotated method; this method is no-longer responsible for building the Parsley context so I renamed it from <code>initializeContext()</code> to <code>primeService()</code>, as that's all it now does; it primes the <code>StubDirectoryService</code> with people and the id to trigger the error case.
+
+<h5>Introducing the the <code>ParsleyRunner</code>...</h5>
+<pre class="brush: as3">
+package com.darrenbishop.support.flexunit.parsley {
+    import flash.utils.getDefinitionByName;
+    import flash.utils.getQualifiedClassName;
+    
+    import flex.lang.reflect.metadata.MetaDataAnnotation;
+    
+    import org.flexunit.internals.runners.statements.IAsyncStatement;
+    import org.flexunit.internals.runners.statements.StatementSequencer;
+    import org.flexunit.runner.notification.IRunNotifier;
+    import org.flexunit.runners.BlockFlexUnit4ClassRunner;
+    import org.flexunit.runners.model.FrameworkMethod;
+
+    public class ParsleyRunner extends BlockFlexUnit4ClassRunner {
+        public static const CONTEXT_METADATA_NAME:String = 'Context';
+        
+        private var contextDescriptor:Class;
+        
+        public function ParsleyRunner(cls:Class) {
+            super(cls);
+            var ctxMetaData:MetaDataAnnotation = testClass.klassInfo.getMetaData(CONTEXT_METADATA_NAME);
+            this.contextDescriptor = classFor(ctxMetaData.defaultArgument.key)
+        }
+        
+        private function classFor(name:String):Class {
+            return Class(getDefinitionByName(getQualifiedClassName(name)));
+        }
+        
+        private function withParsleyContextBuilt(test:Object):IAsyncStatement {
+            return new BuildParsleyContext(test, contextDescriptor);
+        }
+
+        protected override function withBefores(method:FrameworkMethod, test:Object, statement:IAsyncStatement):IAsyncStatement {
+            if (contextDescriptor) {
+                var sequencer:StatementSequencer = new StatementSequencer();
+                sequencer.addStep(withParsleyContextBuilt(test));
+                sequencer.addStep(super.withBefores(method, test, statement));
+                return sequencer;
+            }
+            else {
+                return super.withBefores(method, test, statement);
+            }
+        }
+    }
+}
+</pre>
+
+I determine the class that describes the Parsley context for this test in the constructor, by retrieving the default attribute value of the <code>[Context]</code> metadata tag; this I consider to be a one-off class-level operation. The <code>withBefores(...)</code> template method is invoked before each test method, to contribute to the preparation of the environment in which the test method will execute; this method delegates to <code>withParsleyContextBuilt(...)</code> to generate a <code>BuildParsleyContext</code> <i>command-object</i>. <code>BuildParsleyContext</code> is not a Parsley command, as in the one being tested - it's just the pattern/convention used in the FlexUnit internals.
+
+<h5><code>BuildParsleyContext</code>, the heavy lifter</h5>
+This command-object does all the work using the Parsley ActionScript3 API for context initialization:
+<pre class="brush: as3">
+package com.darrenbishop.support.flexunit.parsley {
+    import flash.utils.getDefinitionByName;
+    
+    import org.flexunit.internals.runners.statements.AsyncStatementBase;
+    import org.flexunit.internals.runners.statements.IAsyncStatement;
+    import org.flexunit.token.AsyncTestToken;
+    import org.spicefactory.parsley.core.context.Context;
+    import org.spicefactory.parsley.flex.FlexContextBuilder;
+
+    public class BuildParsleyContext extends AsyncStatementBase implements IAsyncStatement {
+        protected var test:Object;
+        protected var contextDescriptor:Class;
+        
+        public function BuildParsleyContext(target:Object, contextDescriptor:Class) {
+            this.test = target;
+            this.contextDescriptor = contextDescriptor;
+        }
+        
+        public function evaluate(parentToken:AsyncTestToken):void {
+            buildContext(parentToken);
+        }
+
+        private function buildContext(parentToken:AsyncTestToken):void {
+            var error:Error = null;
+            try {
+                var ctx:Context = FlexContextBuilder.build(contextDescriptor);
+                ctx.createDynamicContext().addObject(test);
+            }
+            catch (e:Error) {
+                error = e;
+            }
+            
+            parentToken.sendResult(error);
+        }
+    }
+}
+</pre>
+Basically, what once lived and would have been replicated in the <code>[Before]</code> methods of each and every Parsley-powered test, now lives here; but again, there's nothing new, just a relocation of code to somewhere more appropriate for re-use.
+
+<p>
+And that's it for the <code>[RunWith]</code> approach, but now with the relase of FlexUnit-4.1, we have...
+
+<h5>The <code>[Rule]</code> approach</h5>
+This hook mechanism completely solves the problem of having to declare the runner implementation class as a string in a metadata attribute:
+<pre class="brush: as3">
+package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.GetPersonCommandComponentTestContext;
+    import com.darrenbishop.crm.directory.domain.Person;
+    import com.darrenbishop.support.create;
+    import com.darrenbishop.support.flexunit.async.AsyncHelper;
+    import com.darrenbishop.support.flexunit.parsley.ParsleyRule;
+    
+    import flash.events.ErrorEvent;
+    import flash.events.EventDispatcher;
+    
+    import org.flexunit.assertThat;
+    import org.hamcrest.object.equalTo;
+    import org.spicefactory.parsley.core.messaging.MessageProcessor;
+    
+    public class GetPersonCommandParsleyRuleComponentTest extends AsyncHelper {
+        [Rule]
+        public var rule:ParsleyRule = new ParsleyRule(GetPersonCommandComponentTestContext);
+        
+        [MessageDispatcher]
+        public var dispatcher:Function;
+        
+        [Inject]
+        public var service:StubDirectoryService;
+        
+        [Inject]
+        public var command:GetPersonCommand;
+        
+        public var dodgyPerson:Person;
+        
+        public var soundPerson:Person;
+        
+        private var eventDispatcher:EventDispatcher;
+        
+        [Before]
+        public function primeService():void {
+            eventDispatcher = new EventDispatcher();
+            
+            dodgyPerson = create(Person, {'id': 1, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6803225});
+            soundPerson = create(Person, {'id': 2, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168});
+            
+            service.add(dodgyPerson, soundPerson);
+            
+            service.dodgyPerson = dodgyPerson.id;
+            service.soundPerson = soundPerson.id;
+        }
+        
+        [MessageError(type='com.darrenbishop.crm.directory.application.PersonEvent')]
+        public function rethrowIt(processor:MessageProcessor, error:Error):void { 
+            eventDispatcher.dispatchEvent(toEvent(error));
+        }
+        
+        [MessageHandler(selector='PersonEvent.found')]
+        public function passItOn(event:PersonEvent):void {
+            eventDispatcher.dispatchEvent(event);
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler does not mangle the person found.')]
+        public function resultDoesNotManglePersonFound():void {
+            dispatcher(PersonEvent.newLookup(soundPerson.id));
+            waitFor(eventDispatcher, PersonEvent.FOUND, 1000);
+            thenAssert(function(event:PersonEvent, data:*):void {
+                assertThat(event.type, equalTo('PersonEvent.found'));
+                assertThat(event.person.fullname, equalTo('John002 Smith002'));
+            });
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler verifies the id of the person found.')]
+        public function resultVerifiesPersonFound():void {
+            dispatcher(PersonEvent.newLookup(dodgyPerson.id));
+            waitFor(eventDispatcher, ErrorEvent.ERROR, 1000);
+            thenAssert(function(event:ErrorEvent, data:*):void {
+                assertThat(event.text, equalTo(sprintf('Found person (%d) does not match lookup person (%d)', soundPerson.id, dodgyPerson.id)));
+            });
+        }
+    }
+}
+</pre>
+
+The shift can be simply thought of as declaring the runner implementation as a member variable i.e. <code>rule</code> and annotating it with the <code>[Rule]</code> metadata tag, rather than as a string metadata attribute. Of course, now it's no longer a runner, but a rule and extends a different parent class and implements slightly different template methods... but for the most part it's the same.
+
+<h5>The <code>ParsleyRule</code> to rule it all</h5>
+As mentioned there are few differences, but one welcome difference, now that the rule is declared and initialized as an instance variable, is that in doing so the constructor is called and any arbitrary arguments can be passed in. I use this to communicate which Parsley context to initialize, by passing in the class that defines it.
+
+<pre class="brush: as3">
+package com.darrenbishop.support.flexunit.parsley {
+    import org.flexunit.internals.runners.statements.IAsyncStatement;
+    import org.flexunit.internals.runners.statements.MethodRuleBase;
+    import org.flexunit.internals.runners.statements.StatementSequencer;
+    import org.flexunit.rules.IMethodRule;
+    import org.flexunit.runners.model.FrameworkMethod;
+    import org.flexunit.token.AsyncTestToken;
+
+    public class ParsleyRule extends MethodRuleBase implements IMethodRule {
+        private var contextDescriptor:Class;
+        
+        public function ParsleyRule(contextDescriptor:Class) {
+            super();
+            this.contextDescriptor = contextDescriptor;
+        }
+        
+        override public function apply(base:IAsyncStatement, method:FrameworkMethod, test:Object):IAsyncStatement {
+            var sequencer:StatementSequencer = new StatementSequencer();
+            sequencer.addStep(withParsleyContextBuilt(test));
+            sequencer.addStep(base);
+            return super.apply(sequencer, method, test);
+        }
+        
+        private function withParsleyContextBuilt(test:Object):IAsyncStatement {
+            return new BuildParsleyContext(test, contextDescriptor);
+        }
+        
+        override public function evaluate(parentToken:AsyncTestToken):void {
+            super.evaluate(parentToken);
+            proceedToNextStatement();
+        }
+    }
+}
+</pre>
+
+The <code>[Rule]</code> approach has the benefit that it does not exhaust the use of inheritance, nor does it use <code>[RunWith]</code>, both of which are use-once mechanisms.
+
+<p>
+There is now the benefit that multiple rules can be defined and used in conjunction with each other; this removes the impediments to mocking described in <a href="/2011/04/darren-on-flex-flexunit4-testing-with_11.html">Part-1</a>
+
+<p>
+I have actually succeeded in mocking a <code>DirectoryService</code> instance and embedding that instance into the Parsley context ready for dependency-injection, but that's another blog :-)
+
+<h2>What's Next...</h2>
+
+<h5><a href="/2011/06/darren-on-flex-flexunit4-testing-with.html">Part 5: Testing with a Parsley-Aware DSL</a></h5>
+The final (planned) part of this blog series will demonstrate the <code>ParsleyHelper</code> base class. <code>ParsleyHelper</code> extends from <code>AsyncHelper</code>, introduced in <a href="/2011/04/darren-on-flex-flexunit4-testing-with_19.html">Part-3</a>, to add a layer of abstraction for all the Parsley bits and pieces; this improved DSL implementation allows for the removal of all reference to anything-Parsley
+
+<p>
+... except for the <code>ParsleyRule</code>
+
+<p>
+... and the <code>ParsleyHelper</code>.

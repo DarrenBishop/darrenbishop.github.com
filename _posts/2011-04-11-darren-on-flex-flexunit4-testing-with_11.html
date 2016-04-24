@@ -1,0 +1,276 @@
+---
+layout: post
+title: 'Darren on Flex: FlexUnit4 Testing with Parsley - Unit Testing Command Objects'
+date: '2011-04-11T19:33:00.003+01:00'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- TDD
+- Agile
+- FlexUnit
+- FlashBuilder
+- Parsley
+- Flexmojos
+- DSL
+- Testing
+modified_time: '2011-06-17T07:08:18.333+01:00'
+thumbnail: http://1.bp.blogspot.com/-iy0dCTr26tc/TZ1fto_b-zI/AAAAAAAAAIc/hQmcM7zlj24/s72-c/cairngorm-layout.png
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-8709278360037481378
+blogger_orig_url: http://blog.darrenbishop.com/2011/04/darren-on-flex-flexunit4-testing-with_11.html
+---
+
+In Part I, I'll start off by implementing a 'purist' unit-test. In order to do this, however, I need a context; I think a noddy CRM system will do - I was tempted to use a Calculator system, but decided against it as there was too much temptation to actually implement some logic.
+
+<blockquote>
+<i>Ironically, the point of this blog series is not about testing logic :-/</i>
+</blockquote>
+
+<h2>CRM It Is Then...</h2>
+<a href="http://1.bp.blogspot.com/-iy0dCTr26tc/TZ1fto_b-zI/AAAAAAAAAIc/hQmcM7zlj24/s1600/cairngorm-layout.png" imageanchor="1" style="clear: right; float: right; margin-bottom: 1em; margin-right: 1em;"><img border="0" height="185" src="http://1.bp.blogspot.com/-iy0dCTr26tc/TZ1fto_b-zI/AAAAAAAAAIc/hQmcM7zlj24/s400/cairngorm-layout.png" width="342" /></a>
+As mentioned in the <a href="/2011/04/darren-on-flex-flexunit4-testing-with.html">intro</a>, I've been working with Cairngorm3 and typically testing Parsley Command objects and Cairngorm-style PresentationModels (PMs).
+<p>
+After applying the Cairngorm3 guidelines to the CRM system, I've structured the project as illustrated.
+
+<div style="clear: both;">
+At the application-layer there is the:
+<ul>
+<li><code>DirectoryService</code> interface, which will be stubbed and later used by Parsley to injection-by-type
+</li>
+<li><code>GetPersonCommand</code>, which in this exercise will be the unit-under-test (UUT)
+</li>
+<li>and <code>PersonEvent</code>, which will eventually be used with Parsley's Messaging Framework to implement low-coupling.
+</li>
+</ul>
+In the domain-layer there's the lonely <code>Person</code> class; I'll be making assertions against this and at some point during the series I'll demonstrate two neat ways to build and leverage test-fixtures.
+</div>
+
+<h2>The 'main' Code...</h2>
+<h5>First up is the <code>DirectoryService</code> interface</h5>
+<pre class="brush: as3">package com.darrenbishop.crm.directory.application {
+    import mx.rpc.AsyncToken;
+    
+    public interface DirectoryService {
+        function lookupById(id:uint):AsyncToken;
+    }
+}
+</pre>
+Bit of a crappy CRM, with its one service call, but remember this is about testing the Command object, not service logic.
+
+<h5>Next is the aforementioned UUT, the <code>GetPersonCommand</code></h5>
+This is a standard Command adhering to the <code>execute-result-error</code> method naming convention. These methods will be auto-detected by Parsley if the command is declared as a <code>DynamicCommand</code>; I'll use the <code>[Metadata]</code> tags when it comes to it:
+<pre class="brush: as3">package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.domain.Person;
+    
+    import mx.collections.ArrayCollection;
+    import mx.rpc.AsyncToken;
+    import mx.rpc.Fault;
+
+    public class GetPersonCommand {
+        public var dispatcher:Function;
+        
+        public var service:DirectoryService;
+        
+        public function execute(event:PersonEvent):AsyncToken {
+            return service.lookupById(event.id);
+        }
+        
+        public function result(person:Person, event:PersonEvent):void {
+            if (person.id != event.id) {
+                throw new Error(sprintf('Found person (%d) does not match lookup person (%d)', person.id, event.id));
+            }
+            dispatcher(PersonEvent.newFound(person));
+        }
+        
+        public function error(f:Fault, event:PersonEvent):void {
+        }
+    }
+}
+</pre>
+You can see the <code>execute</code> method is a simple pass-through i.e. there is no <i>outbound</i> data-translation or encoding, etc. before the service call.
+
+<p>
+The <code>result</code> method doesn't do any <i>inbound</i> data-translation, etc. but I do introduce a bit of verification logic: where the <code>event</code> parameter is passed the original triggering event i.e. the same object received by the <code>execute</code> method, I have access to the <code>id</code> of the person requested; the <code>person</code> parameter is passed the person looked-up and found by the <i>would-be</i> CRM system's directory-service. I use this data to verify I have actually found the person I am looking for... put another way, I've contrived a situation where I can throw an error; you'll see I will force this situation to implement a negative-test.
+
+<h5>Last but not least, the <code>PersonEvent</code></h5>
+Events are re-purposed in Parsley as messages in its Messaging Framework - broadly doing the same thing as the standard event-mechanism, but offering better de-coupling, implementing a <i>topic-subscription</i> approach with message <code>selectors</code>.
+<pre class="brush: as3">package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.domain.Person;
+    
+    import flash.events.Event;
+
+    public class PersonEvent extends Event {
+        public static const LOOKUP:String = 'PersonEvent.lookup';
+        
+        public static const FOUND:String = 'PersonEvent.found';
+        
+        private var _id:uint;
+        
+        public function get id():uint {
+            return _id;
+        }
+        
+        private var _person:Person;
+        
+        public function get person():Person {
+            return _person;
+        }
+        
+        function PersonEvent(_:Guard, type:String) {
+            super(type);
+        }
+        
+        public static function newLookup(id:uint):PersonEvent {
+            var event:PersonEvent = new PersonEvent(Guard.IT, LOOKUP);
+            event._id = id;
+            return event;
+        }
+
+        public static function newFound(person:Person):PersonEvent {
+            var event:PersonEvent = new PersonEvent(Guard.IT, FOUND);
+            event._person = person;
+            return event;
+        }
+        
+        public override function clone():Event {
+            var event:PersonEvent = new PersonEvent(Guard.IT, type);
+            event._id = id;
+            event._person = person;
+            return event;
+        }
+    }
+}
+
+class Guard {
+    internal static const IT:Guard = new Guard();
+}
+</pre>
+I use static factory methods here in-lieu of constructor-overloading - better anyway for removing confusion over what events are being constructed with what arguments. To restrict access to the sole constructor, I use a slight variation of the internal-Sentinel pattern that's quite common in Flex.
+
+<p>
+Anyway, that's it for the 'main' code, on to...
+
+<h2>The 'test' Code...</h2>
+I'll start with the actual test class
+<h5>The FlexUnit4 <code>GetPersonCommandUnitTest</code></h5>
+This is a unit-test in the purist sense; all I'm interested in here is the behaviour of the command object, specifically, what goes on in the <code>execute-result-error</code> methods. I feed the command canned-data and spy on it's outputs by controlling the objects it collaborates with. In this test case, those would be the <code>service</code> and <code>dispatcher</code> objects; the latter, which is a Function object, I use directly to make assertions, the former I inspect and assert on what I find.
+<pre class="brush: as3">
+package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.domain.Person;
+    import com.darrenbishop.support.create;
+    
+    import org.flexunit.assertThat;
+    import org.flexunit.asserts.fail;
+    import org.hamcrest.object.equalTo;
+    
+    public class GetPersonCommandUnitTest {
+        public var service:StubLookupTrackingDirectoryService;
+        public var command:GetPersonCommand;
+        
+        [Before]
+        public function prepareCommand():void {
+            service = new StubLookupTrackingDirectoryService();
+            command = new GetPersonCommand();
+            command.service = service;
+        }
+        
+        [Test(description='Test GetPersonCommand calls the DirectoryService.lookupById(...) service correctly.')]
+        public function lookUpByIdIsCalledCorrectly():void {
+            service.add(create(Person, {'id': 001, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6977150}));
+            service.add(create(Person, {'id': 002, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168}));
+            service.add(create(Person, {'id': 003, 'firstname': 'John003', 'lastname': 'Smith003', 'phone': 7208442}));
+            
+            command.execute(PersonEvent.newLookup(002));
+            command.execute(PersonEvent.newLookup(001));
+            command.execute(PersonEvent.newLookup(003));
+            
+            assertThat(service.nextLookup().fullname, equalTo('John002 Smith002'));
+            assertThat(service.nextLookup().fullname, equalTo('John001 Smith001'));
+            assertThat(service.nextLookup().fullname, equalTo('John003 Smith003'));
+        }
+        
+        [Test(description='Test GetPersonCommand result-handler does not mangle the person found.')]
+        public function resultDoesNotManglePersonFound():void {
+            command.dispatcher = function(event:PersonEvent):void {
+                assertThat(event.person.fullname, equalTo('John002 Smith002'));
+            };
+            
+            var person:Person = create(Person, {'id': 002, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168});
+            command.result(person, PersonEvent.newLookup(002));
+        }
+        
+        [Test(expects='Error',description='Test GetPersonCommand result-handler verifies the id of the person found.')]
+        public function resultVerifiesPersonFound():void {
+            command.dispatcher = function(event:PersonEvent):void {  };
+            
+            var person:Person = create(Person, {'id': 001, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168});
+            command.result(person, PersonEvent.newLookup(002));
+        }
+    }
+}
+</pre>
+
+I've implemented three tests, including the one negative test, that gives 75% branch coverage; testing the <code>error</code> method is just the same as testing the <code>result</code> method, so I've skipped it.
+
+<p>
+Some might wonder why I don't use mocking to stub/mock the <code>DirectoryService</code> - I really ought to have but the integration options of, say mockito-flex (my favourite), are not available to me: I can't extend <code>MockitoTestCase</code> or use the <code> MockitoClassRunner</code> as in the next parts I use both mechanisms to implement the Parsley integration and DSL support.
+
+<p>
+On that note, here's the code for the stubbed <code>DirectoryService</code>...
+
+<h5>Faking It: The StubLookupTrackingDirectoryService</h5>
+<pre class="brush: as3">package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.domain.Person;
+    
+    import flash.utils.Dictionary;
+    
+    import mx.rpc.AsyncToken;
+    
+    public class StubLookupTrackingDirectoryService implements DirectoryService {
+        private var people:Dictionary;
+        
+        private var lookups:Array;
+        
+        public function StubLookupTrackingDirectoryService() {
+            people = new Dictionary();
+            resetLookups();
+        }
+        
+        public function resetLookups():void {
+            lookups = [];
+        }
+        
+        public function add(person:Person):void {
+            if (people[person.id]) {
+                throw new Error('A person with id ' + person.id + ' already exists.');
+            }
+            
+            people[person.id] = person;
+        }
+        
+        public function nextLookup():Person {
+            return lookups.shift();
+        }
+        
+        public function lookupById(id:uint):AsyncToken {
+            lookups.push(people[id]);
+            return null;
+        }
+    }
+}
+</pre>
+
+You can see the stub has two variables:
+<ul>
+<li><code>people</code>, a dictionary which keys <code>Person</code> objects against their <code>id</code>
+<li><code>lookups</code>, which is used to track the order in which the Command object makes person lookups... I know, it screams out for mocking, right
+</ul>
+
+The <code>people</code> dictionary was originally populated with a dozen or so <code>Person</code> objects; I refactored this as having the test fixture combined into the stub isn't so good. I pushed it out to the test methods, which is a better approach, providing self documenting tests; from reading the test method I know exactly: what reference-data I'm priming the system with i.e. the <code>Person</code> objects; what test-data I'm activating the system with i.e. the <code>id</code> to lookup with; what output-data I expect i.e. the found person. Much better.
+
+<h2>What's Next...</h2>
+
+<a href="/2011/04/darren-on-flex-flexunit4-testing-with_17.html"><h5>Part 2: Asynchronous Testing with Parsley and Fluint Sequences</h5></a>
+I'll use FlexUnit4's <code>[Before]</code> feature to build a Parsley context and dynamically initialize the test class with references to the object-under-test (OUT) and the OUT's dependencies.
+<p>
+I'll also show using Fluint Sequences to test a complete asynchronous flow through the Command object.

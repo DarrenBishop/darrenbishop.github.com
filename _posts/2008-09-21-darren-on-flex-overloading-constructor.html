@@ -1,0 +1,83 @@
+---
+layout: post
+title: 'Darren on Flex: Overloading the Constructor'
+date: '2008-09-21T11:45:00.001+01:00'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- TDD
+- Personal Thoughts
+- Testing
+modified_time: '2008-09-21T11:49:54.651+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-891141856223849476
+blogger_orig_url: http://blog.darrenbishop.com/2008/09/darren-on-flex-overloading-constructor.html
+---
+
+<h3>Prologue</h3>
+Back on the 3rd September 2008 some of my colleagues at <a href="http://www.zuehlke.com/en/know-how/technologies/agile-software-development/">Zuhlke</a> unvailed StuffPlanner at a <a href="http://www.bcs-spa.org/cgi-bin/view/SPA/AgilePlanningAdventure">BCS SPA evening talk</a>. StuffPlanner is an Agile estimation and planning tool with an opinion.
+
+Recently, I found myself ramping up my involvement in the development of StuffPlanner. Consequently, I have resumed my study and assessment of the technologies involved and their corresponding conventions and recommended usage. Henceforth, I blog briefly on the topic of constructor overloading.
+
+<h3>Wait! ActionScript Does Not Support Overloading!</h3>
+No, it doesn't... but please, keep reading.
+
+Sometime this week I received a communicade from a local colleague who is doing some pretty interesting work on the continent on the Flex platform. He asked me how to, or rather can you, overload a constructor. We (the locals) had (less) recently had a debate about this after realising that AS3 (ActionScript 3) does not support overloading, so I was primed to make a suitable response.
+
+<h4>Default Parameters</h4>
+Basically, in lieu of overloading AS3 gives you default parameters
+<pre name="code" class="js:nogutter">
+public function DefaultValueExample(required:String, andTheCommonCase:String="DEFAULT") {
+    if (!required) {
+        throw new ArgumentError("You must specify required arguments");
+    }
+
+    // construct something with the required value andTheCommonCase
+} 
+</pre>
+Obviously the API designer needs to know the complete set of parameters, that is, those that must be specified and those that can have a default values.
+
+So far my references to the <i>common-case</i> are just to the concept of it, a place holder. The common-case represents the design challenge in using this language feature while, simultaneously, it represents the design limitation; the common-case(s) is prescribed to all the API clients irrespective of client needs. However, in practice the common-case is not a difficult trade-off to figure out and tends to be only a minor inconvenience. For example, in my experience, such cases tend to crop up during unit testing, which I anticipate will be less of a problem with TDD (yes, I am still homing my skills with TDD on Flex/AS3).
+
+<h4>Variable Arguments</h4>
+It may also be useful to use varargs to replace constructor overloading.
+<pre name="code" class="js:nogutter">
+public function VarArgExample(... args) {
+    for each (var arg:* in args) {
+        // process arg...
+    }
+    //... then do construction
+}
+</pre>
+I reckon this has less application than default parameters as it only makes-sense/works when the (signature of the) things you are using during construction have parameters of no-type (<code>*</code> or <code>Object</code>) or a common super-type. Then you can either leverage duck-typing or polymorphism, respectively, to do smart things, which I won't discuss here.
+
+<h4>The Factory Pattern</h4>
+Oh yes, that old gem!
+
+I am a growing fan of using intention revealing names for variables and methods. It is perhaps a more common/old practice for variables (although you'd be surprised, even today), where variables are named to reveal the state it represents and/or for what it could be used to achieve.
+
+With methods, on the other hand, I sense a stigma, a taboo, in using this technique in any progressive way. Thus I feel there is a general hesitance to use this practice, as if it would imply some mediocrity in the coder's skill at writing <i>good</i> code. I do feel TDD development has gone some way to alleviate this, specifically, where test method names describe the example situation being tested; this some how seems more socially acceptable. And, while I'm at it, I'd like to suggest that this technique encourages you to write more cohesive methods w.r.t. what an object's methods do to contribute to the object's overall task.
+
+The reason I discuss this here (I did not plan to get into it that much) is because AS3 does not allow you to reuse method names i.e. no overloading. So rather than settling for less, why not combine intention revealing names with the Factory pattern. Now I have said it, I bet you are realizing you do this all the time (I anticipate) during testing, where you might have refactored some creational code for some objects used commonly in your tests.
+
+So what if we drop the usual <code>XxxFactory</code>'s <code>getInstance()</code>, <code>newInstances()</code> and <code>createInstance()</code> cruft and adopt something more revealing?
+<pre name="code" class="js:nogutter">
+//Person.as
+public class Person {
+    public function Person(firstName:String="", lastName:String="", ... middleNames) {
+        // do somthing
+    }  
+}
+
+//PersonFactory.as
+public class PersonFactory {
+    public function newPersonWithFirstName(firstname:String):Person { return new Person(firstname); }
+    public function newPersonWithLastName(lastname:String):Person { return new Person(null, lastname); } // A little inconvenient
+    public function newPersonWithFirstAndLastName(firstname:String, lastname:String):Person { return new Person(firstname, lastname); }
+}
+</pre>
+So what's the runtime overhead? Just the extra <code>PersonFactory</code> class, where the would-be constructor overloads are replaced with simple methods; let's face it, negligible.
+
+And the API overhead? Well interestingly, a problem has emerged and a pattern has been used to solve it. Furthermore, our intention revealing names should improve readability of the code and identifies a good place to refactor/relocate creational code that gets used over and over again... like, for instance, in your tests.
+
+Comments welcome.

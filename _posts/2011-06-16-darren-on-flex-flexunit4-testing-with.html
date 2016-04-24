@@ -1,0 +1,190 @@
+---
+layout: post
+title: 'Darren on Flex: FlexUnit4 Testing with Parsley - Testing with a Parsley-Aware
+  DSL'
+date: '2011-06-16T00:23:00.007+01:00'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- TDD
+- Agile
+- FlexUnit
+- FlashBuilder
+- Parsley
+- Flexmojos
+- DSL
+- Testing
+modified_time: '2015-10-14T09:49:57.255+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-3910298558211324547
+blogger_orig_url: http://blog.darrenbishop.com/2011/06/darren-on-flex-flexunit4-testing-with.html
+---
+
+In <a href="/2011/04/darren-on-flex-flexunit4-testing-with_20.html">Part-4</a> I showed how to use <code>[RunWith]</code> and <code>[Rule]</code> to locate and hide Parsley context initialization; with the reduced duplication in this approach tests are left to focus on what is important - testing.  <p>In Part-5, I'll show how to <strike>reduce the noise</strike> hide the complexities of Parsley Messaging, used to implement decoupling between components, by extending the Fluint-aware DSL introduced in <a href="/2011/04/darren-on-flex-flexunit4-testing-with_19.html">Part-3</a> to be Parsley-aware.  <h2>The 'test' code re-re-re-revisted...</h2><h5>Hiding Messages</h5>As mentioned, this improved DSL attempts to hide uses of the Parsley Framework. The approach is limited to hiding usage of the Parsley Messaging API, but supports a comfortable balance of declarative and imperative coding seen in story-style testing i.e. given-when-then.  <p>We retain the declarative approach to dependency injection i.e. with <code>[Inject]</code>, yet this approach is less fitting for messaging/coupling management in a test(-method). Story tests tend to read as a sequence of imperative commands to prepare (<i>Given</i>), actuate (<i>When</i>) and inspect (<i>Then</i>) the object-under-test. In this style you often specify which message to dispatch and which to listen out for... and when... and for how long (timeout). You have the opportunity to state your <i>messaging</i> intentions clearly, in-line, that is, not having a test distributed over several methods (some of which being annotated with <code>[MessageHandler(...)]</code> metadata tags).  <pre class="brush: as3">package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.GetPersonCommandComponentTestContext;
+    import com.darrenbishop.support.flexunit.parsley.ParsleyHelper;
+    
+    import org.flexunit.asserts.fail;
+    import flash.events.ErrorEvent;
+    import org.flexunit.assertThat;
+    import org.hamcrest.object.equalTo;
+    import com.darrenbishop.support.create;
+    import com.darrenbishop.crm.directory.domain.Person;
+    import com.darrenbishop.support.flexunit.parsley.ParsleyRule;
+    
+    public class GetPersonCommandParsleyRuleDSLComponentTest extends ParsleyHelper {
+        [Rule]
+        public var rule:ParsleyRule = new ParsleyRule(GetPersonCommandComponentTestContext);
+        
+        [Inject]
+        public var service:StubDirectoryService;
+        
+        [Inject]
+        public var command:GetPersonCommand;
+        
+        public var dodgyPerson:Person;
+        
+        public var soundPerson:Person;
+        
+        [Before]
+        public function primeService():void {
+            dodgyPerson = create(Person, {'id': 1, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6803225});
+            soundPerson = create(Person, {'id': 2, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168});
+            
+            service.add(dodgyPerson, soundPerson);
+            
+            service.dodgyPerson = dodgyPerson.id;
+            service.soundPerson = soundPerson.id;
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler does not mangle the person found.')]
+        public function resultDoesNotManglePersonFound():void {
+            dispatchMessage(PersonEvent.newLookup(soundPerson.id));
+            waitForMessage(PersonEvent.FOUND, 1000);
+            thenAssert(function(event:PersonEvent, data:*):void {
+                assertThat(event.type, equalTo('PersonEvent.found'));
+                assertThat(event.person.fullname, equalTo('John002 Smith002'));
+            });
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler verifies the id of the person found.')]
+        public function resultVerifiesPersonFound():void {
+            dispatchMessage(PersonEvent.newLookup(dodgyPerson.id));
+            waitForMessage(ErrorEvent.ERROR, 1000);
+            thenAssert(function(event:ErrorEvent, data:*):void {
+                assertThat(event.text, equalTo(sprintf('Found person (%d) does not match lookup person (%d)', soundPerson.id, dodgyPerson.id)));
+            });
+        }
+    }
+}
+</pre>Note the test class now extends <code>ParsleyHelper</code>, building on the inheritance approach to provide access to the messaging-DSL methods; you'll see shortly that this new helper class extends from <code>AsyncHelper</code>, so the async-DSL methods are still available.  <p>There are a number of changes to note and to make them clear I've provided a diff generated from the test above and that presented in <a href="/2011/04/darren-on-flex-flexunit4-testing-with_20.html">Part-4</a>:  <pre class="brush: diff">--- C:/Dev/workspaces/flex/parsley-flexunit/src/test/flex/com/darrenbishop/crm/directory/application/GetPersonCommandParsleyRuleComponentTest.as Wed Jun 15 21:00:39 2011
++++ C:/Dev/workspaces/flex/parsley-flexunit/src/test/flex/com/darrenbishop/crm/directory/application/GetPersonCommandParsleyRuleDSLComponentTest.as Wed Jun 15 20:54:17 2011
+@@ -4,3 +4,3 @@
+     import com.darrenbishop.support.create;
+-    import com.darrenbishop.support.flexunit.async.AsyncHelper;
++    import com.darrenbishop.support.flexunit.parsley.ParsleyHelper;
+     import com.darrenbishop.support.flexunit.parsley.ParsleyRule;
+@@ -8,3 +8,2 @@
+     import flash.events.ErrorEvent;
+-    import flash.events.EventDispatcher;
+     
+@@ -12,5 +11,4 @@
+     import org.hamcrest.object.equalTo;
+-    import org.spicefactory.parsley.core.messaging.MessageProcessor;
+     
+-    public class GetPersonCommandParsleyRuleComponentTest extends AsyncHelper {
++    public class GetPersonCommandParsleyRuleDSLComponentTest extends ParsleyHelper {
+         [Rule]
+@@ -18,5 +16,2 @@
+         
+-        [MessageDispatcher]
+-        public var dispatcher:Function;
+-        
+         [Inject]
+@@ -31,8 +26,4 @@
+         
+-        private var eventDispatcher:EventDispatcher;
+-        
+         [Before]
+         public function primeService():void {
+-            eventDispatcher = new EventDispatcher();
+-            
+             dodgyPerson = create(Person, {'id': 1, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6803225});
+@@ -46,16 +37,6 @@
+         
+-        [MessageError(type='com.darrenbishop.crm.directory.application.PersonEvent')]
+-        public function rethrowIt(processor:MessageProcessor, error:Error):void { 
+-            eventDispatcher.dispatchEvent(toEvent(error));
+-        }
+-        
+-        [MessageHandler(selector='PersonEvent.found')]
+-        public function passItOn(event:PersonEvent):void {
+-            eventDispatcher.dispatchEvent(event);
+-        }
+-        
+         [Test(async,description='Test GetPersonCommand result-handler does not mangle the person found.')]
+         public function resultDoesNotManglePersonFound():void {
+-            dispatcher(PersonEvent.newLookup(soundPerson.id));
+-            waitFor(eventDispatcher, PersonEvent.FOUND, 1000);
++            dispatchMessage(PersonEvent.newLookup(soundPerson.id));
++            waitForMessage(PersonEvent.FOUND, 1000);
+             thenAssert(function(event:PersonEvent, data:*):void {
+@@ -68,4 +49,4 @@
+         public function resultVerifiesPersonFound():void {
+-            dispatcher(PersonEvent.newLookup(dodgyPerson.id));
+-            waitFor(eventDispatcher, ErrorEvent.ERROR, 1000);
++            dispatchMessage(PersonEvent.newLookup(dodgyPerson.id));
++            waitForMessage(ErrorEvent.ERROR, 1000);
+             thenAssert(function(event:ErrorEvent, data:*):void {
+</pre>Counting the new lines (6) and the dropped lines (20, not including blank-lines) reveals a net 14 line reduction of boilerplate code that would otherwise be repeated as your tests grow in quantity and size.  <p>With this improved DSL, tests become even simpler to read.  <h5><code>[MessageDispatcher]</code> - refactored</h5>As mentioned all the explicit Parsley Messaging Framework usage has been pulled up to the <code>ParsleyHelper</code> super class: <pre class="brush: as3">package com.darrenbishop.support.flexunit.parsley {
+    import com.darrenbishop.support.flexunit.async.AsyncHelper;
+    
+    import flash.events.Event;
+    import flash.events.EventDispatcher;
+    
+    import org.spicefactory.parsley.core.messaging.MessageProcessor;
+
+    public class ParsleyHelper extends AsyncHelper {
+        [MessageDispatcher]
+        public var dispatcher:Function;
+        
+        protected var eventDispatcher:EventDispatcher;
+        
+        [Before]
+        public function prepareEventDispatcher():void {
+            eventDispatcher = new EventDispatcher();
+        }
+        
+        [MessageError]
+        public function rethrowIt(processor:MessageProcessor, error:Error):void { 
+            eventDispatcher.dispatchEvent(toEvent(error));
+        }
+        
+        [MessageHandler]
+        public function passItOn(msg:Event):Boolean {
+            return eventDispatcher.dispatchEvent(msg);
+        }
+        
+        protected function dispatchEvent(event:Event):void {
+            eventDispatcher.dispatchEvent(event);
+        }
+        
+        protected function dispatchMessage(event:Event):void {
+            dispatcher(event);
+        }
+        
+        protected function dispatchError(error:Error):void {
+            eventDispatcher.dispatchEvent(toEvent(error));
+        }
+        
+        protected function waitForMessage(eventType:String, timeout:Number=1000):void {
+            waitFor(eventDispatcher, eventType, timeout);
+        }
+        
+        protected function waitForError(eventType:String, timeout:Number=1000):void {
+            waitForMessage(eventType, timeout);
+        }
+    }
+}
+</pre>Here we have all the methods pertinent to Parsley messaging, laid out and self explanatory.  <p>Furthermore this approach does a good job of hiding usage of the Flex Event mechanism; this messaging-DSL removes the need to interact explicitly with an <code>EventDispatcher</code>.  <h2>What's Next...</h2><a href="http://blog.darrenbishop.com/2014/11/darren-on-flex-flexunit4-testing-with.html"><h5>Part 6: All That, But With Mocking</h5></a> So I've got one more Ace up my sleeve - <i>mock-injection</i>. <strike>At this point I'm not even sure this is a good idea or whether there's a place for this technique in any practical testing scenario.</strike> I have recently read the Spring documentation on this and have since seen this done in enough places to be convinced there is value in it for component/sub-system testing.<br />
+<p><strike>Nonetheless,</strike> I figured it out and implemented it; the implementation in fact requires some modifications, including some to Mockito-Flex classes. I've contributed these code changes to the Mockito-Flex project, which I believe will be rolled in or otherwise accommodated soon; you can read more about it <a href="https://bitbucket.org/loomis/mockito-flex/issue/36/control-the-application-domain-in-which">here</a>

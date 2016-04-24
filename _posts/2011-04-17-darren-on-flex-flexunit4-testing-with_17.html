@@ -1,0 +1,282 @@
+---
+layout: post
+title: 'Darren on Flex: FlexUnit4 Testing with Parsley - Asynchronous Testing with
+  Parsley and Fluint Sequences'
+date: '2011-04-17T18:37:00.009+01:00'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- TDD
+- Agile
+- FlexUnit
+- FlashBuilder
+- Parsley
+- Flexmojos
+- DSL
+- Testing
+modified_time: '2011-06-17T07:27:48.882+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-7691265549383826403
+blogger_orig_url: http://blog.darrenbishop.com/2011/04/darren-on-flex-flexunit4-testing-with_17.html
+---
+
+In <a href="/2011/04/darren-on-flex-flexunit4-testing-with_11.html">Part-1</a> I showed a pure-unit test, completely managed outside Parsley.
+
+<p>
+In Part-2 I'll show how to implement a <i>component-test</i>, with some of the setup delegated to Parsley to leverage IoC and DI.
+
+<h2>The 'test' code: revisited...</h2>
+Again I'll jump straight into the test class itself
+
+<h5>The FlexUnit4 <code>GetPersonCommandComponentTest</code></h5>
+
+<pre class="brush: as3">
+package com.darrenbishop.crm.directory.application {
+    import com.darrenbishop.crm.directory.GetPersonCommandComponentTestContext;
+    import com.darrenbishop.crm.directory.domain.Person;
+    import com.darrenbishop.support.create;
+    
+    import flash.events.ErrorEvent;
+    import flash.events.EventDispatcher;
+    
+    import org.flexunit.assertThat;
+    import org.fluint.sequence.SequenceRunner;
+    import org.fluint.sequence.SequenceWaiter;
+    import org.hamcrest.object.equalTo;
+    import org.spicefactory.parsley.core.context.Context;
+    import org.spicefactory.parsley.core.messaging.MessageProcessor;
+    import org.spicefactory.parsley.flex.FlexContextBuilder;
+    
+    public class GetPersonCommandComponentTest {
+        [MessageDispatcher]
+        public var dispatcher:Function;
+        
+        [Inject]
+        public var context:Context;
+        
+        [Inject]
+        public var service:StubDirectoryService;
+        
+        [Inject]
+        public var command:GetPersonCommand;
+        
+        public var dodgyPerson:Person;
+        
+        public var soundPerson:Person;
+        
+        private var eventDispatcher:EventDispatcher;
+        
+        private var sequence:SequenceRunner;
+        
+        [Before(async)]
+        public function initializeContext():void {
+            var ctx:Context = FlexContextBuilder.build(GetPersonCommandComponentTestContext);
+            ctx.createDynamicContext().addObject(this);
+            
+            eventDispatcher = new EventDispatcher();
+            
+            sequence = new SequenceRunner(this);
+            
+            dodgyPerson = create(Person, {'id': 1, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6803225});
+            soundPerson = create(Person, {'id': 2, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168});
+            
+            service.add(dodgyPerson, soundPerson);
+            
+            service.dodgyPerson = dodgyPerson.id;
+            service.soundPerson = soundPerson.id;
+        }
+        
+        [After]
+        public function destroyContext():void {
+            context.destroy();
+            eventDispatcher = null;
+            sequence = null;
+        }
+
+        [MessageError(type='com.darrenbishop.crm.directory.application.PersonEvent')]
+        public function rethrowIt(processor:MessageProcessor, error:Error):void { 
+            eventDispatcher.dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, error.message));
+        }
+        
+        [MessageHandler(selector='PersonEvent.found')]
+        public function passItOn(event:PersonEvent):void {
+            eventDispatcher.dispatchEvent(event);
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler does not mangle the person found.')]
+        public function resultDoesNotManglePersonFound():void {
+            dispatcher(PersonEvent.newLookup(soundPerson.id));
+            
+            sequence.addStep(new SequenceWaiter(eventDispatcher, PersonEvent.FOUND, 1000));
+            
+            sequence.addAssertHandler(function(event:PersonEvent, data:*):void {
+                assertThat(event.type, equalTo('PersonEvent.found'));
+                assertThat(event.person.fullname, equalTo('John002 Smith002'));
+            });
+            
+            sequence.run();
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler verifies the id of the person found.')]
+        public function resultVerifiesPersonFound():void {
+            dispatcher(PersonEvent.newLookup(dodgyPerson.id));
+            
+            sequence.addStep(new SequenceWaiter(eventDispatcher, ErrorEvent.ERROR, 1000));
+            
+            sequence.addAssertHandler(function(event:ErrorEvent, data:*):void {
+                assertThat(event.text, equalTo(sprintf('Found person (%d) does not match lookup person (%d)', soundPerson.id, dodgyPerson.id)));
+            });
+            
+            sequence.run();
+        }
+    }
+}
+</pre>
+
+There's one quick thing to point out here - this <i>component-test</i> is actually simpler than the <i>unit-test</i> discussed in Part-1, with one fewer tests as there's no value in verifying the service-call-sequencing again. Incidentally, the remaining two tests still provide 75% coverage (for the same reasons as before).
+
+<p>
+Right, I'll breeze past <code>dispatcher</code>, <code>command</code> and <code>service</code>; these are standard injections you'd use while programming with Parsley.
+
+<p>
+A lesser known fact about <code>context</code>: no declaration is required for this dependency i.e. in <code>GetPersonCommandTestContext</code>; Parsley will detect the expectation of an object of type <code>org.spicefactory.parsley.core.context.Context</code> and will inject that instance in which <code>this</code> is initialized by, that is, the context doing the injections will be injected.<br />
+Pretty neat, eh. <strike>I will show how to leverage this later in the series.</strike>
+
+<p>
+The next two variables, <code>dodgyPerson</code> and <code>soundPerson</code>, reflect a kind-of agreement between the <code>StubDirectoryService</code> implementation that is injected and the test, which is something like: if you request <code>dodgyPerson</code>, I will send back  <code>soundPerson</code>; I use this to implement the negative-test.<br />
+<b>Again</b>, mocking would be the better approach here, where interactions would then be dictated rather than just implied... moving on...
+
+<p>
+The <code>eventDispatcher</code> is used here to bridge the Parsley Messaging Framework and FlexUnit (Fluint) Asynchronous Testing.
+
+<p>
+The <code>sequence</code> object is the key to FlexUnit (Fluint) Asynchronous Testing; it must be used with the <code>async</code> attribute in <code>[Before]</code>, <code>[After]</code> or <code>[Test]</code> metadata tags.
+
+<h5>Where the Magic Happens... Well, Some of It Anyway</h5>
+<code>initializeContext()</code> is where the Parsley context is initialized and <code>this</code> test instance along with it.
+<pre class="brush: as3">
+        [Before(async)]
+        public function initializeContext():void {
+            var ctx:Context = FlexContextBuilder.build(GetPersonCommandComponentTestContext);
+            ctx.createDynamicContext().addObject(this);
+            
+            eventDispatcher = new EventDispatcher();
+            
+            sequence = new SequenceRunner(this);
+            
+            dodgyPerson = create(Person, {'id': 1, 'firstname': 'John001', 'lastname': 'Smith001', 'phone': 6803225});
+            soundPerson = create(Person, {'id': 2, 'firstname': 'John002', 'lastname': 'Smith002', 'phone': 6809168});
+            
+            service.add(dodgyPerson, soundPerson);
+            
+            service.dodgyPerson = dodgyPerson.id;
+            service.soundPerson = soundPerson.id;
+        }
+</pre>
+From discussions I've had with my peers, it's the key insight and biggest stumbling block. Funnily enough, it's clearly documented <a href="http://www.spicefactory.org/parsley/docs/2.2/manual/config.php#mxml">here</a> and <a href="http://www.spicefactory.org/parsley/docs/2.2/manual/lifecycle.php#dynamic">here</a> how to initialize a context programmatically, but I still needed <a href="http://graemeharker.blogspot.com/2010/02/can-flexunit4-test-parsley-applications.html">help</a> joinining the dots :-/
+
+<p>
+I borrowed those ideas and used them to implement a different approach:
+<ul>
+<li>One (potentially) monolithic <code>FlexUnitApplicationContext</code> can be broken down to contain only what's relevant to each test
+<li>The test method states which context to use, making it more clear/traceable what is in the test environment (think: <code>Ctrl+click</code>)
+<li>Different contexts allow for different service (interface) implementations i.e. less injection-by-id
+<li>Tools like FlashBuilder and Flexmojos are free to control (generate) the test application e.g. <code>FlexUnitApplication</code>
+</ul>
+
+<p>
+Both <code>eventDispatcher</code> and <code>sequence</code> are initialized - nothing exciting - and <code>destroyContext()</code> is also pretty straightforward.
+
+<p>
+Assignments to <code>service.dodgyPerson</code>, <code>dodgyPerson</code> <code>service.soundPerson</code> and <code>soundPerson</code> setup the agreement between the <code>this</code> test and the <code>service</code>.
+
+<p>
+Now let's review the rest of the code in method-pairs - this is is where the real magic happens...
+
+<h5>Where the Real Magic Happens</h5>
+First <code>passItOn(...)</code> and <code>resultDoesNotManglePersonFound()</code>:
+<pre class="brush: as3">
+        [MessageHandler(selector='PersonEvent.found')]
+        public function passItOn(event:PersonEvent):void {
+            eventDispatcher.dispatchEvent(event);
+        }
+        
+        [Test(async,description='Test GetPersonCommand result-handler does not mangle the person found.')]
+        public function resultDoesNotManglePersonFound():void {
+            dispatcher(PersonEvent.newLookup(soundPerson.id));
+            
+            sequence.addStep(new SequenceWaiter(eventDispatcher, PersonEvent.FOUND, 1000));
+            
+            sequence.addAssertHandler(function(event:PersonEvent, data:*):void {
+                assertThat(event.type, equalTo('PersonEvent.found'));
+                assertThat(event.person.fullname, equalTo('John002 Smith002'));
+            });
+            
+            sequence.run();
+        }
+</pre>
+
+Looking first at the test-method, you can quite easily read the <i>sequence</i> of <i>events</i>:
+<ol>
+<li>I send off a person lookup request
+<li>I wait for the person to be found
+<li>I check the person is who I expect
+</ol>
+Looking into the detail, the lookup request is sent using the Parsley injected <code>dispatcher</code> i.e. using the Parsley Messaging Framework, yet the test is using Fluint (FlexUnit) to wait for the found notification i.e. using the plain-vanilla Flex Event Mechanism; the two technologies must be bridged - this is where <code>passItOn(...)</code> comes in.
+
+<p>
+<code>passItOn(...)</code> is adorned with the <code>[MessageHandler]</code> metadata tag, which Parsley will detect during initialization and wire-up to its Messaging Framework. Now, the test instance will be informed when a person is found. When that happens, this method simply uses the <code>eventDispatcher</code> to pass the found event onto the Flex Event Mechanism; where this <code>eventDispatcher</code> is the same one used by Fluint, the test execution can now proceed.
+
+<p>
+Now for <code>rethrowIt(...)</code> and <code>resultVerifiesPersonFound()</code>:
+<pre class="brush: as3">
+        [MessageError(type='com.darrenbishop.crm.directory.application.PersonEvent')]
+        public function rethrowIt(processor:MessageProcessor, error:Error):void { 
+            eventDispatcher.dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, error.message));
+        }
+        
+        ...
+        
+        [Test(async,description='Test GetPersonCommand result-handler verifies the id of the person found.')]
+        public function resultVerifiesPersonFound():void {
+            dispatcher(PersonEvent.newLookup(dodgyPerson.id));
+            
+            sequence.addStep(new SequenceWaiter(eventDispatcher, ErrorEvent.ERROR, 1000));
+            
+            sequence.addAssertHandler(function(event:ErrorEvent, data:*):void {
+                assertThat(event.text, equalTo(sprintf('Found person (%d) does not match lookup person (%d)', soundPerson.id, dodgyPerson.id)));
+            });
+            
+            sequence.run();
+        }
+</pre>
+
+Again looking at the test-method first, you can see that:
+<ol>
+<li>I send off a lookup request for the dodgy-person, thus triggering an error
+<li>I wait for an error
+<li>I check the error informs me of something remotely useful... or at least what the command thinks is useful
+</ol>
+
+When I first tried to implement this negative test, it didn't work; naturally I had copy-pasted the unit-test and littered it with the <code>async</code> metadata-attribute and <code>sequence</code> stuff... <i>no bueno</i>.
+
+<p>
+But then it dawned on me that error detection i.e. for <code>[Test(expect=...)]</code>, needed errors to occur in the same call-stack, so that when the stack unwinds, FlexUnit can use a <code>try-catch</code> block to detect and cross-check for the <code>expect=...</code> and make an assertion on the expected error type.
+
+<p>
+That's my unverified rationalization for why it didn't work, anyway, and for adopting a similar messaging approach as before, hence <code>rethrowIt(...)</code>. I had previously thought the error was getting lost, but I knew <a href="http://www.spicefactory.org/parsley/docs/2.2/manual/messaging.php#errorhandlers">there was a way to respond to them</a>.
+
+<p>
+<code>rethrowIt(...)</code> is annotated with the <code>[MessageError]</code> metadata tag, which again, Parsley will detect during initialization and wire-up. So whenever there is an error in a <code>[MessageHandler]</code> or <code>[CommandResult]</code>, Parsley will let the test know via <code>rethrowIt(...)</code>.
+
+<p>
+Similar to <code>passItOn(...)</code>, <code>rethrowIt(...)</code> uses the <code>eventDispatcher</code> to pass the error onto the Flex Event Mechanism; <code>rethrowIt(...)</code> is a little bit different in that it must marshal the <code>Error</code> object into a form the Flex Event Mechanism can understand, that is, an event and specifically a <code>ErrorEvent</code> instance.
+
+<h2>What's Next...</h2>
+
+<a href="/2011/04/darren-on-flex-flexunit4-testing-with_19.html"><h5>Part 3: Hiding Fluint Sequences with a Flow-based DSL</h5></a>
+
+I'll introduce the <code>AsyncHelper</code> base class and leverage FlexUnit's <code>[Before]</code> and <code>[After]</code> inheritance to abstract away all that Fluint Sequence stuff.
+
+<p>
+This approach makes available a bunch of helper methods that make asynchronous tests much easier to read.

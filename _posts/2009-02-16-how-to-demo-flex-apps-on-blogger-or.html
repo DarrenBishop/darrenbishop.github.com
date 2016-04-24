@@ -1,0 +1,84 @@
+---
+layout: post
+title: 'How To: Demo Flex Apps On Blogger or Google Sites'
+date: '2009-02-16T00:38:00.012Z'
+author: Darren Bishop
+tags:
+- Flex
+- Google
+- Blogging
+modified_time: '2009-02-27T14:10:05.616Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-3925594380627921828
+blogger_orig_url: http://blog.darrenbishop.com/2009/02/how-to-demo-flex-apps-on-blogger-or.html
+---
+
+While working on my new <a href="https://sites.google.com/site/flexinsproject/Home">Flexins Project</a> and <a href="http://workingwithmrb.blogspot.com/2009/02/darren-on-flex-flexins-project-launch.html">blogging</a> accordingly, I discovered that you can embed you Flex application into your page quite easily.
+
+Here are the rawest of raw instructions on how to do it.
+<h5>Flex on Blogger</h5>
+<pre name="code" class="html">
+&lt;object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
+    id="Main" width="100%" height="100%"
+    codebase="http://fpdownload.macromedia.com/get/flashplayer/current/swflash.cab"&gt;
+    &lt;param name="movie" value="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin/dnd-mixin-demo-0.2.swf?attredirects=0" /&gt;
+    &lt;param name="quality" value="high" /&gt;
+    &lt;param name="bgcolor" value="#869ca7" /&gt;
+    &lt;param name="allowScriptAccess" value="sameDomain" /&gt;
+    &lt;embed src="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin/dnd-mixin-demo-0.2.swf?attredirects=0" quality="high" bgcolor="#869ca7"
+        width="100%" height="100%" name="Main" align="middle"
+        play="true"
+        loop="false"
+        quality="high"
+        allowScriptAccess="sameDomain"
+        type="application/x-shockwave-flash"
+        pluginspage="http://www.adobe.com/go/getflashplayer"&gt;
+    &lt;/embed&gt;
+&lt;/object&gt;
+</pre>
+<b>UPDATE, 27.02.2009</b>: It seems Blogger ignores the <code>&lt;object&gt;...&lt;/object&gt;</code> tags, so the nested <code>&lt;embed&gt;...&lt;/embed&gt;</code> is sufficient. While I would not normally recommend removing <i>robustness</i>... parts of the <code>&lt;object&gt;...&lt;/object&gt;</code> code was showing in my blog, so I got rid of it altogether.
+
+Also make sure the remaining <code>&lt;embed&gt;...&lt;/embed&gt;</code> is format correctly i.e. no erroneous newlines; this was causing some of the parameters e.g. width and height, to be ignored.
+<h5>Flex on Google Sites</h5>
+<pre name="code" class="xml">
+&lt;Module&gt;
+    &lt;ModulePrefs title="__UP_title__"
+    width="600"
+    height="450"
+    scrolling="true"
+    author="Darren Bishop"
+    author_email="dbishop81@gmail.com"
+    description="GG to help embed Flex applications into Blogger or Google Sites"&gt;
+        &lt;Require feature="flash" /&gt;
+    &lt;/ModulePrefs&gt;
+    &lt;UserPref name="title" display_name="Title" default_value="Flex Application Embedder" /&gt;
+    &lt;UserPref name="swf_url" display_name="SW URL" /&gt;
+    &lt;Content type="html"&gt;
+    &lt;![CDATA[
+    &lt;object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
+        id="Main" width="100%" height="100%"
+        codebase="http://fpdownload.macromedia.com/get/flashplayer/current/swflash.cab"&gt;
+        &lt;param name="movie" value="__UP_swf_url__" /&gt;
+        &lt;param name="quality" value="high" /&gt;
+        &lt;param name="bgcolor" value="#869ca7" /&gt;
+        &lt;param name="allowScriptAccess" value="sameDomain" /&gt;
+        &lt;embed src="__UP_swf_url__" quality="high" bgcolor="#869ca7"
+            width="100%" height="100%" name="Main" align="middle"
+            play="true"
+            loop="false"
+            quality="high"
+            allowScriptAccess="sameDomain"
+            type="application/x-shockwave-flash"
+            pluginspage="http://www.adobe.com/go/getflashplayer"&gt;
+        &lt;/embed&gt;
+    &lt;/object&gt;
+    ]]&gt;
+    &lt;/Content&gt;
+&lt;/Module&gt;
+</pre>
+
+<h5>Wordpress</h5>
+Sorry, you are on your own. Somehow, I don't think it would be that hard to do.
+
+If you can't figure it out, feel free to ask for help.
+
+Cheers

@@ -1,0 +1,29 @@
+---
+layout: post
+title: 'Darren on Ruby: JGem, JRake... For Your Convenience'
+date: '2009-04-11T11:42:00.005+01:00'
+author: Darren Bishop
+tags: 
+modified_time: '2009-04-12T13:07:08.987+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-7719448289216532985
+blogger_orig_url: http://blog.darrenbishop.com/2009/04/jgem-jrake-for-your-convenience.html
+---
+
+I have recently been investigating migrating RoR apps to JRoR, furthermore to Tomcat/JEE. This naturally means that I have both Ruby and JRuby installed at the same time, both on my <code>PATH</code> variable, meaning one takes precedence over the other; in my case Ruby comes first.
+
+Consequentially, I found myself typing in <code>jruby -S gem ...</code> or <code>jruby -S rake ...</code> a lot of the time and it started to annoy me. I took a look into the <code>JRUBY_HOME\bin</code> folder and discovered there is the <code>jirb.bat</code> script, obviously the JRuby equivalent to IRB. The inards are:
+<pre class="brush: bash">
+@ECHO OFF
+IF NOT "%~f0" == "~f0" GOTO :WinNT
+@"jruby.bat" -S "jirb" %1 %2 %3 %4 %5 %6 %7 %8 %9
+GOTO :EOF
+:WinNT
+@"jruby.bat" "%~dpn0" %*
+</pre>
+Pretty simple, ay? So what happens when you change the <code>jirb</code> to <code>gem</code> or <code>rake</code>? Exactly what you expect, lol. Go ahead and do it, save the files as <code>jgem.bat</code> and <code>jrake.bat</code>, respectively.
+
+You are now good to go. This should work for any executable-type script residing in your <code>JRUBY_HOME\bin</code> e.g. <code>jwarble.bat</code>.
+
+I'm not sure why the JRuby team did/do not distribute these scripts as standard, especially for <code>gem</code> and <code>rake</code>, as they are as common as <code>irb</code>.
+
+Anyway, enjoy.

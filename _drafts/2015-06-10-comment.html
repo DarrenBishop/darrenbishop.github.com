@@ -1,0 +1,135 @@
+---
+layout: post
+title: 'Darren on Flex: UI Preferences with Parsley Managed Persistence'
+date: '2015-06-10T02:22:00.000+01:00'
+author: Darren Bishop
+tags:
+- Specs
+- Java
+- ActionScript
+- TDD
+- JVM
+- Scala
+- Lift
+- Parsley
+- Maven
+- Mocking
+- ScalaTest
+- Flex
+- Agile
+- BDD
+- Flexmojos
+- BlazeDS
+modified_time: '2015-06-10T02:22:31.566+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-3071831543450512087
+blogger_orig_url: https://www.blogger.com/comment.g?blogID=3826577489563855618&postID=3071831543450512087
+---
+
+<blockquote><h3>PROLOGUE</h3>Parsley is the prevailing container framework for Flex applications in the finance sector.<br />
+It offers many APIs to implement and uphold various patterns and principles widely coveted in OO development e.g. Inversion of Control, Dependency Injection, Loose Coupling, Messaging, Encapsulation, Modularization, MVC, and so on.<br />
+One API I feel is generally overlooked is Parsley Managed Persistence.<br />
+Maybe this is owing to the author stating in the relevant documentation its limitations for persisting only primitive types.<br />
+Maybe it's because, out-of-the-box you only get local persistence, implemented on Flash-cookies.<br />
+Persistence for UI related properties - that is, less to do with business-data and more to do with UI-preferences - is undeniably a desirable application feature; it facilitates productivity<br />
+I have seen time and effort spent implementing this functionality as a standalone feature, where less time and effort could be spent leveraging Parsley Managed Persistence to provide the same with a near-seamless integration.<br />
+In this post I will show how to over come the limitations of Parsley Managed Persistence, providing a reference implementation for persistent distributed UI-preferences.<br />
+</blockquote><br />
+<h2 class="pagebreak">The Stack</h2>In order for preferences to be available across machines, we most move beyond the default Flash-cookie based persistent store to a distributed-system with a server based persistent store.<br />
+What that server based store looks like depends on local/team/organization considerations.<br />
+Here I stick with the Flex-ecosystem, building an implementation on BlazeDS, Scala, Liftweb and MongoDB<br />
+<br />
+<h5>BlazeDS</h5>I assume you are familiar with BlazeDS here and do not delve too much into t<br />
+<br />
+<pre class="brush: xml"><?xml version="1.0" encoding="UTF-8"?>
+<services-config>
+    <factories>
+        <factory id="preferencesServiceFactory" class="com.darrenbishop.blog.flex.PreferencesServiceFactory" />
+    </factories>
+
+    <services>
+        <service-include file-path="remoting-config.xml" />
+    </services>
+
+    <security>
+        <login-command class="flex.messaging.security.TomcatLoginCommand" server="Tomcat" />
+    </security>
+
+    <channels>
+        <channel-definition id="my-amf" class="mx.messaging.channels.AMFChannel">
+            <endpoint url="http://{server.name}:{server.port}/{context.root}/messagebroker/amf"
+                      class="flex.messaging.endpoints.AMFEndpoint" />
+            <properties>
+                <serialization>
+                    <type-marshaller>com.darrenbishop.blog.flex.serialization.ListMarshaller</type-marshaller>
+                </serialization>
+            </properties>
+        </channel-definition>
+    </channels>
+
+    <logging>
+        <target class="flex.messaging.log.ConsoleTarget" level="Error">
+            <properties>
+                <prefix>[BlazeDS]</prefix>
+                <includedate>false</includeDate>
+                <includetime>false</includeTime>
+                <includelevel>false</includeLevel>
+                <includecategory>false</includeCategory>
+            </properties>
+            <filters>
+                <pattern>Endpoint.*</pattern>
+                <pattern>Service.*</pattern>
+                <pattern>Configuration</pattern>
+            </filters>
+        </target>
+    </logging>
+
+    <system>
+        <redeploy>
+            <enabled>false</enabled>
+        </redeploy>
+    </system>
+</services-config>
+</pre><br />
+<pre class="brush: xml"><?xml version="1.0" encoding="UTF-8"?>
+<service id="remoting-service"
+         class="flex.messaging.services.RemotingService">
+
+    <adapters>
+        <adapter-definition id="java-object" class="flex.messaging.services.remoting.adapters.JavaAdapter"
+                            default="true"/>
+    </adapters>
+
+    <default-channels>
+        <channel ref="my-amf"/>
+    </default-channels>
+
+    <destination id="NicknameService">
+        <properties>
+            <source>com.darrenbishop.blog.naming.NicknameService</source>
+        </properties>
+    </destination>
+
+    <destination id="PreferencesService">
+        <properties>
+            <factory>preferencesServiceFactory</factory>
+            <source>com.darrenbishop.blog.persistence.PreferencesService</source>
+            <scope>session</scope>
+        </properties>
+    </destination>
+</service>
+</pre><br />
+<div>Simple Flex application</div><div>Parsley Persistence API</div><div>Bootstrapping your Flex application</div><br />
+<br />
+<blockquote>Block-quote<br />
+</blockquote><br />
+<sub>Sub-script</sub><br />
+<br />
+<h2>Section Heading</h2><br />
+<ul><li>Unordered List Item</li>
+</ul><br />
+<ol><li>Ordered List Item</li>
+</ol><br />
+<h2>Section Heading</h2><h5>Sub Heading</h5><pre class="brush: java">Some Code
+</pre><br />
+<br />
+<br />

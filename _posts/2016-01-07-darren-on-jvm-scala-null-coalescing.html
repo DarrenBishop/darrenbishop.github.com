@@ -1,0 +1,60 @@
+---
+layout: post
+title: 'Darren on the JVM: Scala: Null Coalescing Operator for Scala'
+date: '2016-01-07T10:05:00.000Z'
+author: Darren Bishop
+tags:
+- 'null'
+- nsc
+- JVM
+- option
+- Scala
+- nco
+- nso
+- ndo
+- none
+modified_time: '2016-01-11T19:30:03.689Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-3063446606518799
+blogger_orig_url: http://blog.darrenbishop.com/2016/01/darren-on-jvm-scala-null-coalescing.html
+---
+
+<h2 id="null-safedereferencingcoalescing-operator">Null (Safe|Dereferencing|Coalescing) Operator</h2>
+<p>I stumbled on to this concept a while ago when researching the many cool features of Scala. I had come across it before, as I’ll mention, but not so concretely. There is a wealth of information on SO and Wiki, which again leaves mythed why Java (my roots) does not support this.</p>
+<p>Anyway, what I offer here - which btw is not new - is slightly different to the normal <abbr title="Null Coalescing Operator">NCO</abbr> as found in <a href="https://en.wikipedia.org/wiki/Null_coalescing_operator">many other languages</a>, for which it is a supported langauge feature.</p>
+<p>Note, <abbr title="Null Coalescing Operator">NCO</abbr> is supported implicitly by a wider set of laguages i.e. those where every value or expression has a <em>truth value</em>: any value can be coerced to <code>True</code> or <code>False</code>, after which you defer to logical operators; I found this to be the case in ActionScript (I used to be a Flex developer) and is also the case with Bash, where booleans are applicable.</p>
+<p>Having read a few SO posts and seeing what others have put out there, I figured I would have a go at implementing a <abbr title="Null Coalescing Operator">NCO</abbr>, seeing what features of Scala can be utilized and how far I can take it.</p>
+<p>The aim is to get from this</p>
+<p><code data-gist-id="a84f8d40a1e800d37675" data-gist-file="WhatWeHave.scala" data-gist-show-spinner="true" data-gist-hide-footer="true"></code></p>
+<p>to this</p>
+<p><code data-gist-id="a84f8d40a1e800d37675" data-gist-file="WhatWeWant.scala" data-gist-show-spinner="true" data-gist-hide-footer="true"></code></p>
+<p>And just for emphasis, compare the amount of horizontal scrolling you have to do to read those code snippets.</p>
+<h3 id="maybe-null-maybe-not...-its-optional">Maybe Null, Maybe Not… It’s Optional</h3>
+<p>Scala offers Option, Try and Either as ways to program with null and exceptions. Using these aren’t quite the same as programming defensively as the <em>null-check</em> is done automatically under-the-hood. However, like most things Scala, it is a noteworthy paradigm shift… that is, going from <em>Null Programming</em> to <em>Option Programming</em>.</p>
+<p>While Option, its various composition functions and pattern matching are cool for handling null, given checking for null is so common in <abbr title="Object Oriented">OO</abbr> (or at least Java), it’s a little surprising that there isn’t seamless support for crossing over from the Null-world to the Option-world in Scala (… presumably seeking to succeed where Java fails).</p>
+<p>There is the <code>PartialFunction[A, B].lift</code> which helps, but it only goes one-level deep: the benefit is lost if you are required to use a library with a complex Option-less object model; think of some legacy Java library that does not make use of Options, you may as well stick to defensive programming with null-checks.</p>
+<h3 id="extension-methods-a.k.a.-implicits"><em>Extension Methods</em> a.k.a. Implicits</h3>
+<p>Thanks to Scala’s extension methods i.e. implicit type conversions, the crossover from <strong><em>null</em></strong> to <strong><em>Option</em></strong> is made very easy.</p>
+<p><code data-gist-id="a84f8d40a1e800d37675" data-gist-file="NullSafeCoalescerWip.scala" data-gist-show-spinner="true" data-gist-hide-footer="true"></code></p>
+<p>While we haven’t defined any extension methods explicitly, any function of <code>Option</code> is now available to clients of <code>E</code>.</p>
+<p>We could at this point use the familiar composition functions on <code>Option</code>, but we want some nice operator syntactic sugar… it’s all about the sugar!</p>
+<p>So taking the idea a step further, we introduce an intermediate wrapper class - a facade if you like - to provide these operators and translate them onto <code>Option</code> compositon functions.</p>
+<p>So let’s start again with</p>
+<p><code data-gist-id="a84f8d40a1e800d37675" data-gist-file="NullSafeCoalescer.scala" data-gist-line="6-16,32-37" data-gist-show-spinner="true" data-gist-hide-footer="true"></code></p>
+<p>What we produce is a very concise way to dereference null and chain a sequence of <abbr title="Higher Order Functions">HOFS</abbr> together: with this we can drill down into the object graph, evaluating to the targeted value or expression; or to <code>None</code> if <code>null</code> is encountered anywhere along the way.</p>
+<p>Here is an excerpt from a ScalaTest spec I wrote while exploring all this:</p>
+<p><code data-gist-id="a84f8d40a1e800d37675" data-gist-file="NullSafeCoalescerSpec.scala" data-gist-line="17-34" data-gist-show-spinner="true" data-gist-hide-footer="true"></code></p>
+<p>Here you see an example each for passing functions and passing lambdas (anonymous functions); the latter turns out a little unfortunate with all the programming punctuation.</p>
+<p>Nonetheless it works! At this stage we are free to <code>match { ... }</code> or <code>map { ... }</code> and so on.</p>
+<p>We can extends <code>NSCOps</code> to include a whole raft of convenience operators.</p>
+<p>One very cool addition would be performing value checks, that is, for values other than <code>null</code></p>
+<p><code data-gist-id="a84f8d40a1e800d37675" data-gist-file="NullSafeCoalescer.scala" data-gist-line="8-32" data-gist-show-spinner="true" data-gist-hide-footer="true"></code></p>
+<p>How cool is that; all operators continue down the chain if the option is not <code>None</code> and:</p>
+<ul>
+<li><code>?~</code>  the filter expression evaluates to <code>true</code></li>
+<li><code>??</code>  the non-<code>None</code> value matches the by-name (lazy) operand</li>
+<li><code>?!</code>  the non-<code>None</code> value does not match the by-name (lazy) operand</li>
+</ul>
+<p>The by-name operators are probably more useful after the Immutable paradigm shift where case classes are the norm, for which <code>==</code> does the right thing.</p>
+<p>Since originally posting, I have made edits to reference the published gist which you can see in it’s entirety <a href="https://gist.github.com/DarrenBishop/a84f8d40a1e800d37675">here</a>.</p>
+<p><strong><em>PLEASE</em></strong> take note of the non-contiguous line numbers here in the post; the Gist integration I use lets you select line number ranges to show, but does not make it obvious to the reader <strong>…</strong> ellipses would have been nice. Please copy-paste from the <a href="https://gist.github.com/DarrenBishop/a84f8d40a1e800d37675">gist</a>.</p>
+<!--- Glossary -->

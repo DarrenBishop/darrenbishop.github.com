@@ -1,0 +1,557 @@
+---
+layout: post
+title: Syntax Highlighting 2.0 on Blogger
+date: '2009-04-11T16:28:00.019+01:00'
+author: Darren Bishop
+tags:
+- Blogging
+modified_time: '2009-04-11T19:36:55.457+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-7683602495200717181
+blogger_orig_url: http://blog.darrenbishop.com/2009/04/syntax-highlighting-20-on-blogger.html
+---
+
+I previously <a href="http://workingwithmrb.blogspot.com/2008/03/how-to-add-block-of-code-to-my-blog.html">blogged</a> about adding code and displaying it nicely in your blog posts.
+
+<p>
+Back on February 3, 2009 Syntax Highlighting 2.0 was released. It is much nicer than the previous versions and the clipboard feature now works properly - <b>It's also backward compatible</b> or rather it upgrades the old 1.5 style to the 2.0 style without needing to touch all those old blog posts. Cool, ay?
+
+<p>
+Inspired by <a href="http://fazibear.blogspot.com/2007/09/blogger-syntax-higlighter.html">FaziBear</a>, I am providing here a widget that can be used to add SH2.0 to your Blogger so you don't need to worry about the details or go through the trouble I did.
+<blockquote><b>Note:</b> If you have the old version installed via a widget or directly in your template, remove it; it's simply nolonger needed.</blockquote>
+<form action="http://www.blogger.com/add-widget" method="post">
+<input type="hidden" style="display:none" name="widget.content" value="&lt;style&gt;
+/** http://alexgorbatchev.com/pub/sh/2.0.278/styles/shCore.css
+ * SyntaxHighlighter
+ * http://alexgorbatchev.com/
+ *
+ * @version
+ * 2.0.278 (February 03 2009)
+ *
+ * @author
+ * Alex Gorbatchev
+ * 
+ * @copyright
+ * Copyright (C) 2004-2009 Alex Gorbatchev.
+ *
+ * Licensed under a GNU Lesser General Public License.
+ * http://creativecommons.org/licenses/LGPL/2.1/
+ *
+ * SyntaxHighlighter is donationware. You are allowed to download, modify and distribute 
+ * the source code in accordance with LGPL 2.1 license, however if you want to use 
+ * SyntaxHighlighter on your site or include it in your product, you must donate.
+ * http://alexgorbatchev.com/wiki/SyntaxHighlighter:Donate
+ */
+.syntaxhighlighter,
+.syntaxhighlighter .bold,
+.syntaxhighlighter .italic,
+.syntaxhighlighter .line .number,
+.syntaxhighlighter .line .content,
+.syntaxhighlighter .line .content code,
+.syntaxhighlighter .line .content .block,
+.syntaxhighlighter .line .content .spaces,
+.syntaxhighlighter .bar,
+.syntaxhighlighter .ruler,
+.syntaxhighlighter .toolbar,
+.syntaxhighlighter .toolbar a,
+.syntaxhighlighter .toolbar a:hover
+{
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: none;
+    text-align: left;
+    float: none;
+    vertical-align: baseline;
+    position: static;
+    left: auto;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    height: auto;
+    width: auto;
+    line-height: normal;
+    font-family: 'Consolas', 'Monaco', 'Bitstream Vera Sans Mono', 'Courier New', Courier, monospace;
+    font-weight: normal;
+    font-style: normal;
+    font-size: 100%;
+}
+
+.syntaxhighlighter
+{
+    width: 100%;
+    margin: 1em 0 1em 0;
+    padding: 1px; /* adds a little border on top and bottom */
+    position: relative;
+}
+
+.syntaxhighlighter .bold {
+    font-weight: bold;
+}
+
+.syntaxhighlighter .italic {
+    font-style: italic;
+}
+
+.syntaxhighlighter .line .number
+{
+    float: left; 
+    width: 3em; 
+    padding-right: .3em;
+    text-align: right;
+    display: block;
+}
+
+/* Disable numbers when no gutter option is set */
+.syntaxhighlighter.nogutter .line .number
+{
+    display: none;
+}
+
+.syntaxhighlighter .line .content
+{
+    margin-left: 3.3em; 
+    padding-left: .5em;
+    display: block;
+}
+
+.syntaxhighlighter .line .content .block
+{
+    display: block;
+    padding-left: 1.5em;
+    text-indent: -1.5em;
+}
+
+.syntaxhighlighter .line .content .spaces
+{
+    display: none;
+}
+
+/* Disable border and margin on the lines when no gutter option is set */
+.syntaxhighlighter.nogutter .line .content
+{
+    margin-left: 0; 
+    border-left: none;
+}
+
+.syntaxhighlighter .bar
+{
+}
+
+.syntaxhighlighter.collapsed .bar
+{
+
+}
+
+.syntaxhighlighter.nogutter .ruler
+{
+    margin-left: 0;
+    padding-left: 0;
+}
+
+.syntaxhighlighter .ruler
+{
+    padding: 0 0 .5em .5em;
+    margin-left: 3.3em;
+    overflow: hidden;
+}
+
+/* Adjust some properties when collapsed */
+
+.syntaxhighlighter.collapsed .lines,
+.syntaxhighlighter.collapsed .ruler
+{
+    display: none;
+}
+
+/* Styles for the toolbar */
+
+.syntaxhighlighter .toolbar
+{
+    position: absolute;
+    right: 0px;
+    top: 0px;
+    font-size: 1px;
+    padding: 8px 8px 8px 0; /* in px because images don't scale with ems */
+}
+
+.syntaxhighlighter.collapsed .toolbar
+{
+    font-size: 80%;
+    padding: .2em 0 .5em .5em;
+    position: static;
+}
+
+.syntaxhighlighter .toolbar a.item,
+.syntaxhighlighter .toolbar .item
+{
+    display: block;
+    float: left;
+    margin-left: 8px;
+    background-repeat: no-repeat;
+    overflow: hidden;
+    text-indent: -5000px;
+}
+
+.syntaxhighlighter.collapsed .toolbar .item
+{
+    display: none;
+}
+
+.syntaxhighlighter.collapsed .toolbar .item.expandSource
+{
+    background-image: url('http://alexgorbatchev.com/pub/sh/2.0.278/styles/magnifier.png');
+    display: inline;
+    text-indent: 0;
+    width: auto;
+    float: none;
+    height: 16px;
+    padding-left: 20px;
+}
+
+.syntaxhighlighter .toolbar .item.viewSource
+{
+    background-image: url('http://alexgorbatchev.com/pub/sh/2.0.278/styles/page_white_code.png');
+}
+
+.syntaxhighlighter .toolbar .item.printSource
+{
+    background-image: url('http://alexgorbatchev.com/pub/sh/2.0.278/styles/printer.png');
+}
+
+.syntaxhighlighter .toolbar .item.copyToClipboard
+{
+    text-indent: 0;
+    background: none;
+    overflow: visible;
+}
+
+.syntaxhighlighter .toolbar .item.about
+{
+    background-image: url('http://alexgorbatchev.com/pub/sh/2.0.278/styles/help.png');
+}
+
+/** 
+ * Print view.
+ * Colors are based on the default theme without background.
+ */
+
+.syntaxhighlighter.printing,
+.syntaxhighlighter.printing .line.alt1 .content,
+.syntaxhighlighter.printing .line.alt2 .content,
+.syntaxhighlighter.printing .line.highlighted .number,
+.syntaxhighlighter.printing .line.highlighted.alt1 .content,
+.syntaxhighlighter.printing .line.highlighted.alt2 .content,
+.syntaxhighlighter.printing .line .content .block
+{
+    background: none;
+}
+
+/* Gutter line numbers */
+.syntaxhighlighter.printing .line .number
+{
+    color: #bbb;
+}
+
+/* Add border to the lines */
+.syntaxhighlighter.printing .line .content
+{
+    color: #000;
+}
+
+/* Toolbar when visible */
+.syntaxhighlighter.printing .toolbar,
+.syntaxhighlighter.printing .ruler
+{
+    display: none;
+}
+
+.syntaxhighlighter.printing a
+{
+    text-decoration: none;
+}
+
+.syntaxhighlighter.printing .plain,
+.syntaxhighlighter.printing .plain a
+{ 
+    color: #000;
+}
+
+.syntaxhighlighter.printing .comments,
+.syntaxhighlighter.printing .comments a
+{ 
+    color: #008200;
+}
+
+.syntaxhighlighter.printing .string,
+.syntaxhighlighter.printing .string a
+{
+    color: blue; 
+}
+
+.syntaxhighlighter.printing .keyword
+{ 
+    color: #069; 
+    font-weight: bold; 
+}
+
+.syntaxhighlighter.printing .preprocessor 
+{ 
+    color: gray; 
+}
+
+.syntaxhighlighter.printing .variable 
+{ 
+    color: #a70; 
+}
+
+.syntaxhighlighter.printing .value
+{ 
+    color: #090; 
+}
+
+.syntaxhighlighter.printing .functions
+{ 
+    color: #ff1493; 
+}
+
+.syntaxhighlighter.printing .constants
+{ 
+    color: #0066CC; 
+}
+
+.syntaxhighlighter.printing .script
+{
+    font-weight: bold;
+}
+
+.syntaxhighlighter.printing .color1,
+.syntaxhighlighter.printing .color1 a
+{ 
+    color: #808080; 
+}
+
+.syntaxhighlighter.printing .color2,
+.syntaxhighlighter.printing .color2 a
+{ 
+    color: #ff1493; 
+}
+
+.syntaxhighlighter.printing .color3,
+.syntaxhighlighter.printing .color3 a
+{ 
+    color: red; 
+}
+
+.syntaxhighlighter .line .content .block
+{
+background: none !important;
+}
+&lt;/style&gt;
+&lt;style&gt;
+/** http://alexgorbatchev.com/pub/sh/2.0.278/styles/shThemeDefault.css
+ * SyntaxHighlighter
+ * http://alexgorbatchev.com/
+ *
+ * @version
+ * 2.0.278 (February 03 2009)
+ *
+ * @author
+ * Alex Gorbatchev
+ * 
+ * @copyright
+ * Copyright (C) 2004-2009 Alex Gorbatchev.
+ *
+ * Licensed under a GNU Lesser General Public License.
+ * http://creativecommons.org/licenses/LGPL/2.1/
+ *
+ * SyntaxHighlighter is donationware. You are allowed to download, modify and distribute 
+ * the source code in accordance with LGPL 2.1 license, however if you want to use 
+ * SyntaxHighlighter on your site or include it in your product, you must donate.
+ * http://alexgorbatchev.com/wiki/SyntaxHighlighter:Donate
+ */
+/************************************
+ * Default Syntax Highlighter theme.
+ * 
+ * Interface elements.
+ ************************************/
+
+.syntaxhighlighter
+{
+    background-color: #E7E5DC;
+}
+
+/* Highlighed line number */
+.syntaxhighlighter .line.highlighted .number
+{
+    background-color: #6CE26C;
+    color: black;
+}
+
+/* Highlighed line */
+.syntaxhighlighter .line.highlighted.alt1 .content,
+.syntaxhighlighter .line.highlighted.alt2 .content
+{
+    background-color: #6CE26C;
+}
+
+/* Gutter line numbers */
+.syntaxhighlighter .line .number
+{
+    color: #5C5C5C;
+}
+
+/* Add border to the lines */
+.syntaxhighlighter .line .content
+{
+    border-left: 3px solid #6CE26C;
+    color: #000;
+}
+
+.syntaxhighlighter.printing .line .content 
+{
+    border: 0;
+}
+
+/* First line */
+.syntaxhighlighter .line.alt1 .content
+{
+    background-color: #fff;
+}
+
+/* Second line */
+.syntaxhighlighter .line.alt2 .content
+{
+    background-color: #F8F8F8;
+}
+
+.syntaxhighlighter .line .content .block
+{
+    background: url('http://alexgorbatchev.com/pub/sh/2.0.278/styles/wrapping.png') 0 1.1em no-repeat;
+}
+
+.syntaxhighlighter .ruler
+{
+    color: silver;
+    background-color: #F8F8F8;
+    border-left: 3px solid #6CE26C;
+}
+
+.syntaxhighlighter.nogutter .ruler
+{
+    border: 0;
+}
+
+.syntaxhighlighter .toolbar
+{
+    background-color: #F8F8F8;
+    border: #E7E5DC solid 1px;
+}
+
+.syntaxhighlighter .toolbar a
+{
+    color: #a0a0a0;
+}
+
+.syntaxhighlighter .toolbar a:hover
+{
+    color: red;
+}
+
+/************************************
+ * Actual syntax highlighter colors.
+ ************************************/
+.syntaxhighlighter .plain,
+.syntaxhighlighter .plain a
+{ 
+    color: #000;
+}
+
+.syntaxhighlighter .comments,
+.syntaxhighlighter .comments a
+{ 
+    color: #008200;
+}
+
+.syntaxhighlighter .string,
+.syntaxhighlighter .string a
+{
+    color: blue; 
+}
+
+.syntaxhighlighter .keyword
+{ 
+    color: #069; 
+    font-weight: bold; 
+}
+
+.syntaxhighlighter .preprocessor 
+{ 
+    color: gray; 
+}
+
+.syntaxhighlighter .variable 
+{ 
+    color: #a70; 
+}
+
+.syntaxhighlighter .value
+{ 
+    color: #090; 
+}
+
+.syntaxhighlighter .functions
+{ 
+    color: #ff1493; 
+}
+
+.syntaxhighlighter .constants
+{ 
+    color: #0066CC; 
+}
+
+.syntaxhighlighter .script
+{ 
+    background-color: yellow !important;
+}
+
+.syntaxhighlighter .color1,
+.syntaxhighlighter .color1 a
+{ 
+    color: #808080; 
+}
+
+.syntaxhighlighter .color2,
+.syntaxhighlighter .color2 a
+{ 
+    color: #ff1493; 
+}
+
+.syntaxhighlighter .color3,
+.syntaxhighlighter .color3 a
+{ 
+    color: red; 
+}
+&lt;/style&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shCore.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shBrushJava.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shBrushJScript.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shBrushCSharp.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shBrushSql.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shBrushXml.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shBrushPython.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shBrushRuby.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shBrushBash.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shBrushXml.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script src='http://alexgorbatchev.com/pub/sh/2.0.278/scripts/shLegacy.js' type='text/javascript'&gt;&lt;/script&gt;
+&lt;script type='text/javascript'&gt;
+SyntaxHighlighter.config.bloggerMode = true;
+SyntaxHighlighter.config.clipboardSwf = 'http://alexgorbatchev.com/pub/sh/2.0.278/scripts/clipboard.swf';
+SyntaxHighlighter.all();
+dp.SyntaxHighlighter.HighlightAll('code');
+&lt;/script&gt;" />
+  <input type="image" onmouseover="replaceText();" src="http://www.blogger.com/img/add/add2blogger_sm_w.gif" name="go" /> 
+</form>
+
+There is one caveat: Because everything is inlined, you won't get any updates to the remote JS and CSS code. On the otherhand, your blogs will be stable and won't be susceptible to any errors in those updates.
+Enjoy!

@@ -1,0 +1,123 @@
+---
+layout: post
+title: 'Darren on Spring: Annotation Scanning with ClassPathScanningCandidateComponentProvider'
+date: '2016-04-24T07:56:00.000+01:00'
+author: Darren Bishop
+tags: 
+modified_time: '2016-04-24T07:56:49.983+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-4600937109390845076
+blogger_orig_url: https://www.blogger.com/comment.g?blogID=3826577489563855618&postID=4600937109390845076
+---
+
+<a href="http://www.sleberknight.com/blog/sleberkn/entry/20080623">Scott Leberknight&#39;s Weblog</a>   <pre class="brush: java">package com.db.lrc.creditrisk.common;
+
+import static org.apache.commons.lang.StringUtils.isNotEmpty;
+
+import java.io.IOException;
+import java.util.Map;
+
+import javax.annotation.PostConstruct;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.io.Resource;
+import org.springframework.core.type.AnnotationMetadata;
+import org.springframework.core.type.ClassMetadata;
+import org.springframework.core.type.classreading.MetadataReader;
+import org.springframework.stereotype.Component;
+
+import com.db.lrc.creditrisk.common.exception.TechnicalException;
+import com.db.lrc.creditrisk.common.utils.BlazeDSProxy;
+
+import flex.messaging.io.BeanProxy;
+import flex.messaging.io.PropertyProxyRegistry;
+
+@Component
+public class BlazeDSProxyAnnotationScanner extends ClassPathScanningCandidateComponentProvider implements BeanFactoryAware {
+
+    private static final Logger logger = LoggerFactory.getLogger(BlazeDSProxyAnnotationScanner.class);
+    
+    public static final String[] DEFAULT_BASE_PACKAGES = {"com.db.lrc.creditrisk"};
+    
+    private BeanFactory beanFactory;
+    
+    private PropertyProxyRegistry registry;
+    
+    private String[] basePackages = DEFAULT_BASE_PACKAGES;
+
+    public BlazeDSProxyAnnotationScanner() {
+        super(false);
+        registry = PropertyProxyRegistry.getRegistry();
+    }
+
+    @Override
+    public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+        this.beanFactory = beanFactory;
+    }
+
+    public void setBasePackages(String[] basePackages) {
+        this.basePackages = basePackages;
+    }
+    
+    @Override
+    protected boolean isCandidateComponent(MetadataReader metadataReader) throws IOException {
+        AnnotationMetadata annotationMetadata = metadataReader.getAnnotationMetadata();
+        if (annotationMetadata.isAnnotated(BlazeDSProxy.class.getName())) {
+            Resource resource = metadataReader.getResource();
+            Map<String, Object> annoAttrs = annotationMetadata.getAnnotationAttributes(BlazeDSProxy.class.getName());
+            logger.debug("Found annotation attributes for {}: {}", resource, annoAttrs);
+            
+            if (annoAttrs != null) {
+                final String proxyBeanName = (String) annoAttrs.get("ref");
+                final boolean includeReadOnly = (Boolean) annoAttrs.get("includeReadOnly");
+                final Class<? extends ClassMetadata> targetClass = metadataReader.getClassMetadata().getClass();
+                if (isNotEmpty(proxyBeanName)) {
+                    logger.debug("Wiring to bean {}", proxyBeanName);
+                    if (!beanFactory.containsBean(proxyBeanName)) {
+                        throw new TechnicalException("Cannot find bean proxy with name " + proxyBeanName + " for configuring " + targetClass.getName());
+                    }
+                    final BeanProxy beanProxy = beanFactory.getBean(proxyBeanName, BeanProxy.class);
+                    if (beanProxy == null) {
+                        throw new TechnicalException("Bean with name " + proxyBeanName + " is not a BeanProxy");
+                    }
+                    logger.info("Configuring {} to use {} as its BlazeDS bean proxy", targetClass, proxyBeanName);
+                    registry.register(targetClass, beanProxy);
+                }
+                else if (includeReadOnly) {
+                    final BeanProxy beanProxy = new BeanProxy();
+                    beanProxy.setIncludeReadOnly(true);
+                    logger.info("Configuring {} to use a BlazeDS bean proxy that includes read-only fields", targetClass);
+                    registry.register(targetClass, beanProxy);
+                }
+            }
+        }
+        
+        // These aren't beans that are discovered, they are DTOs, so always return false
+        return false;
+    }
+    
+    @PostConstruct
+    public void scan() {
+        for (String basePackage : basePackages) {
+            findCandidateComponents(basePackage);
+        }
+    }
+}
+</pre><pre class="brush: xml"><beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-2.5.xsd">
+    
+    ...
+
+    <context:component-scan base-package="com.db.lrc.creditrisk.common.utils" />
+
+    ...
+</beans>
+</pre>

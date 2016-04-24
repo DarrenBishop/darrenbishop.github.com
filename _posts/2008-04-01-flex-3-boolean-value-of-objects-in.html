@@ -1,0 +1,99 @@
+---
+layout: post
+title: 'Darren on Flex: The Boolean Value of Objects in Logical Expressions'
+date: '2008-04-01T10:23:00.015+01:00'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+modified_time: '2008-08-25T15:25:05.069+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-35978924588396119
+blogger_orig_url: http://blog.darrenbishop.com/2008/04/flex-3-boolean-value-of-objects-in.html
+---
+
+Here's another one for the Flex (ActionScript) programmers out there.
+
+I come from the Java world and my first encounter with ActionScript has been through Flex - well actually, I dabbled in a bit of AS back at uni when I was playing with tweening and animations. Anyway, if you are like me in that respect, then you may not be familiar with all the language constructs, keywords and semantics there in.
+
+One thing, <span style="font-style:italic;">I</span> have just discovered, are that 'non-boolean' variables have a boolean value that are evaluated when used in a logical expression. They go something like this (assigned object values):
+<ul>
+  <li><span style="font-weight:bold;">null</span> = false</li>
+  <li><span style="font-weight:bold;">0 (zero)</span> = false</li>
+  <li><span style="font-weight:bold;">false</span> = false (...really!)</li>
+  <li><span style="font-weight:bold;">eveything else</span> = true (... as far as I know)</li>
+</ul>
+Now there are a few cool things about this:
+
+Firstly, when you build up a logical expression, each object is evaluted for its boolean value prior to application of any logical operator. Based on the rules above, the logical expression will evaluate to <span style="font-weight:bold;">true</span> or <span style="font-weight:bold;">false</span>.
+
+It is my belief that this boolean value is obtained by coersion, from evaluating the logical expression i.e. in accordance with the rules above. So you maybe wondering what it is that's being coerced and from what? It seems the value that is coerced is the last evaluated object that determined the outcome of the expression. This is best explained through examples:
+
+<ul>
+  <li><span style="font-weight:bold;">"aaa" && "aab" && "aac"</span> = "aac"</li>
+  <li><span style="font-weight:bold;">"aaa" && null && "aac"</span> = null</li>
+  <li><span style="font-weight:bold;">"aaa" && "aab" && 0</span> = 0</li>
+  <li><span style="font-weight:bold;">"aab" < "aac"</span> = true</li>
+  <li><span style="font-weight:bold;">"aab" < "aaa"</span> = false</li>
+  <li><span style="font-weight:bold;">1 && 2 && 3 && 4 && 5</span> = 5</li>
+  <li><span style="font-weight:bold;">0 && 1 && 2 && 3 && 4</span> = 0</li>
+</ul>
+Notice the lexical evalution.
+
+Next, it should be obvious by now that you can use logical expressions built in this way in decision constructs (if, for, while etc.) yet still assign them to variables of non-boolean type. For example:
+<pre name="code" class="js">
+    public function someMethod(... params):void
+    {
+        someInstanceArray = params || [];
+    }
+</pre>
+
+<span style="font-weight:bold;">Before:</span>
+<pre name="code" class="js">
+    public function someMethod(... params):void
+    {
+        if (params != null && params.length > 0)
+        {
+            // You can now safely access params[0] now
+            ...           
+        }
+    }
+</pre>
+<span style="font-weight:bold;">After:</span>
+<pre name="code" class="js">
+    public function someMethod(... params):void
+    {
+        if (params && params.length)
+        {
+            // You can now safely access params[0] now
+            ...
+        }
+    }
+</pre>
+<span style="font-weight:bold;">Even After That:</span>
+<pre name="code" class="js">
+    public function someMethod(... params):void
+    {
+        someObject = params && params.length && params[0] || new SomeThingYouNeed();
+    }
+</pre>
+Pretty cool ay.
+
+One thing that confused me (and thus descoped from understanding) was the following tests:
+<pre name="code" class="js">
+    trace("a" == true, " " == true, "" == true);
+    trace("a" == false, " " == false, "" == false);
+    trace(" " && "a", '" " && "a"');
+    trace("" && "a", '"" && "a"');
+</pre>
+which yields
+<pre>
+false false false
+false true true
+a " " && "a"
+ "" && "a"
+</pre>
+Strange uh.
+
+I suspect other languages of the dynamic variety support these semantics e.g. Python; would be nice in Java.
+
+Comments welcome.

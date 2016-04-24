@@ -1,0 +1,29 @@
+---
+layout: post
+title: 'Techie Tidbits: Resolving Symlinks'
+date: '2010-10-04T01:51:00.000+01:00'
+author: Darren Bishop
+tags:
+- Bash
+- Tidbits
+modified_time: '2010-10-04T01:51:50.629+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-1398546930856514485
+blogger_orig_url: http://blog.darrenbishop.com/2010/03/techie-tidbits-resolving-symlinks.html
+---
+
+If you use a linux distro that uses the alternatives framework, from time to time you might need to know where or what those symlinks eventually point to; this was the case for me when I needed to know where my JRE home was... and <code>which java</code> wasn't helping me (much).
+
+Google introduced me to <code>readlink</code> which has an <code>-e</code> or <code>-f</code> option which basically switches on recursion.
+
+So something like <code>readlink -f `which java`</code> told me what I needed to know.
+
+I went a step further and created two aliases in my <code>~/.bash_aliases</code> file (sourced from <code>~/.bashrc</code>), like so:
+
+<pre class="brush: bash">
+alias rle='readlink -e'
+alias rlf='readlink -f'
+</pre>
+
+So <code>rlf `which java`</code> saves you 7 key presses.
+
+All things considered the speed up is probably going to be marginal, but everything helps right?

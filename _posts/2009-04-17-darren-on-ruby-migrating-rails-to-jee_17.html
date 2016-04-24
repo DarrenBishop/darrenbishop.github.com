@@ -1,0 +1,124 @@
+---
+layout: post
+title: 'Darren on Ruby: Migrating Rails to Tomcat / JEE, Part 3: Using Warbler (Rack)
+  to Deploy to Tomcat, Jetty or GlassFish'
+date: '2009-04-17T00:28:00.004+01:00'
+author: Darren Bishop
+tags:
+- Derby
+- Java
+- Rails
+- JRoR
+- Tomcat
+- JRuby
+- Ruby
+- RoR
+modified_time: '2009-04-29T15:34:54.191+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-3984320296179051311
+blogger_orig_url: http://blog.darrenbishop.com/2009/04/darren-on-ruby-migrating-rails-to-jee_17.html
+---
+
+<h4>The Series So Far</h4>
+<p>
+<a href="http://workingwithmrb.blogspot.com/2009/04/migrating-rails-to-jee-part-1-switching.html" target="_blank">Part 1: Switching to JRuby &amp; Apache Derby</a> showed you how to migrate from the Ruby+SQLite3 technology stack to JRuby+Derby.<br />
+<a href="http://workingwithmrb.blogspot.com/2009/04/darren-on-ruby-migrating-rails-to-jee.html" target="_blank">Part 2: Migrating Your Data From SQLite3 to Derby</a> showed you how to export your data out of your SQLite3 database and import that data into your new Apache Derby database.
+</p>
+<p>
+Now I will take you through using <a href="http://wiki.jruby.org/wiki/Warbler">Warbler</a> to package your Rails app into a Web ARchive, ready for running on Tomcat, Jetty, Glassfish or whatever Servlet container you like.
+</p>
+<p>
+<h4>Packaging Rails as a WAR</h4>
+<ol>
+<li>Install Warbler:
+<ul>
+<li><code>jgem install warbler -y</code></li>
+</ul>
+</li>
+<li>Configure Production Database:
+<ul>
+<li>Replace the production spec in <code>RAILS_ROOT\config\database.yml</code> with
+<pre class="brush: xml">
+production:
+  adapter: jdbc
+  url: jdbc:derby:db\blog_ production;create=true
+  driver: org.apache.derby.jdbc.EmbeddedDriver
+  username: app
+  password: app
+</pre>
+</li>
+</ul>
+</li>
+<li>Satisfy Ruby Dependencies:
+<ul>
+<li>We need to make sure that all the Rails app's Ruby runtime dependencies are taken care of. We only need to worry about the dependencies that are required explicitly i.e. not provided transitively by Rails or Warbler. In our case it boils down to the JDBC/Derby stuff.</li>
+<li>To specify the inclusion of these deps, we need to generate and modify the Warbler configuration; first run <code>warble config</code>, then edit the <code>RAILS_ROOT\config\warble.rb</code> file, replacing (or inserting after) this line
+<pre class="brush: ruby">
+  # config.gems += ["activerecord-jdbcmysql-adapter", "jruby-openssl"]
+</pre>
+...with this line
+<pre class="brush: ruby">
+  config.gems += ["activerecord-jdbc-adapter", "activerecord-jdbcderby-adapter", "jdbc-derby", "jruby-openssl"]
+</pre></li>
+</ul>
+</li>
+<li>Satisfy Java Dependencies:
+<ul>
+<li>We need to make sure that all the Rails app's Java runtime dependencies are taken care of, that is, we must ensure the Derby jars will wind-up on the deployed applications <code>CLASSPATH</code>. Here are 3 ways to achieve this, in increasing scope:
+<ol>
+<li>Copy <code>derby.jar</code>, <code>derbyclient.jar</code> and <code>derbynet.jar</code> in <code>DERBY_HOME\lib</code> to <code>RAILS_ROOT\lib</code></li>
+<li>For Tomcat, copy these jars into <code>TOMCAT_HOME\lib</code></li>
+<li>Copy them to <code>JAVA_HOME\jre\lib\ext</code></li>
+</ol>
+Taking the first option, Warbler will by default put these jars into <code>WEB-INF\lib</code> of the built WAR file.</li>
+</ul>
+</li>
+<li>Rails 2.3.2 <a href="http://wiki.jruby.org/wiki/Rails_2.3.2">Session Management Issue</a>:
+<ul>
+<li>We need to make few extra configuration changes due to an incompatibility with Warbler.</li>
+<li>Uncomment the following line in <code>RAILS_ROOT\config\initializers\session_store.rb</code>
+<pre class="brush: ruby">
+# ActionController::Base.session_store = :active_record_store
+</pre></li>
+<li>Run the following commands to bring the database upto spec:
+<pre class="brush: bash">
+jrake db:sessions:create RAILS_ENV=production
+jrake db:migrate RAILS_ENV=production
+</pre></li>
+<li>Now add the following line of code to the <code>RAILS_ROOT\config\warble.rb</code> file:
+<pre class="brush: ruby">
+  config.webxml.jruby.session_store = 'db'
+</pre></li>
+<li>In <code>RAILS_ROOT\config\environment.rb</code>, just before
+<pre class="brush: ruby">
+Rails::Initializer.run do |config|
+</pre>
+... add the following
+<pre class="brush: ruby">
+if defined?(JRUBY_VERSION)
+  # hack to fix jruby-rack's incompatibility with rails edge
+  module ActionController
+    module Session
+      class JavaServletStore
+        def initialize(app, options={}); end
+        def call(env); end
+      end
+    end
+  end
+end
+</pre></li>
+</ul>
+</li>
+</ol>
+
+Now we should be good to go. Run <code>warble</code> which should produce <code>blog.war</code>. Now take this and drop it into <code>TOMCAT_HOME\webapps</code>. Restart Tomcat if it does not auto-deploy the application then navigate to <a href="http://localhost:8080/blog" target="_blank">your blog</a>.
+
+This concludes this 3 part series on migrating from Ruby on Rails+SQLite3+WEBrick to JRuby on Rails+Derby+Tomcat. I hope through this blog I can spare you the pain I have gone through in figuring out how to get all this to work.
+</p>
+<p>
+<h3>Epilogue</h3>
+Next step for me is to get this procedure (of constructing the WAR file) mavenized. Maven handles WAR artifacts seemlessly; furthermore it knows how to <em>'overlay'</em> WAR archives, reducing multiple WARs to one. This obviously simplifies the deployment and maintenance effort, a benefit I hope to reap in my current project that (now) produces three WAR achives.
+
+Good luck in your next steps.
+
+Cheers
+</p>

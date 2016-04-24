@@ -1,0 +1,296 @@
+---
+layout: post
+title: 'Load Testing with JMeter, Part 1: An SUT & JMeter Basics'
+date: '2009-04-17T09:15:00.028+01:00'
+author: Darren Bishop
+tags: 
+modified_time: '2009-10-02T13:49:05.007+01:00'
+thumbnail: http://1.bp.blogspot.com/_Q_F_ea5EKi0/SiF-vdoMAcI/AAAAAAAAAFk/VZ1v4bTdzyU/s72-c/airmiles_login.png
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-8656269054734528557
+---
+
+<h3>Welcome to my series on load testing with JMeter</h3>
+<p>The following topics are developed to be read linearly; if you're
+familiar with any of the content presented in the earlier posts, you can
+of cause jump ahead to the later parts of the series.</p>
+<dl>
+    <dt><i><b>The System Under Test &amp; JMeter Basics</b></i></dt>
+    <dt>Workflows: Capture, Analysis &amp; Implementation</dt>
+    <dt>Load Profiling: Two Ways To Stress The SUT</dt>
+    <dt>Distributed Load Testing</dt>
+    <dt>Monitoring The Health Of Your Application Server</dt>
+</dl>
+
+<h3>ZA.com</h3>
+<p>For this series we focus on performance testing a flight booking
+and flight checking applications of a system for a fictitious company
+called <i>ZA.com</i>.</p>
+<p>The key performance indicator (KPI) i.e. metric, for the booking
+application is booked flights. A significant feature of this application
+will be a flight booking workflow: to book a flight one would need to
+fill out a series of forms; only a completed workflow, with valid data,
+constitutes a successful booking. Errors in workflow completion will not
+count in the throughput calculation of booked flights</p>
+<p>The KPI for the flight checking application will be successful
+flight status checks. There is no workflow in this application.</p>
+<p>I will go into more detail on the booking workflow in the next
+post. The remainder of this post will explorer what JMeter provides for
+testing such a system. We have established so far that the workflow will
+be supported by HTML forms, thus the performance testing will target the
+web-application layer.</p>
+
+<h3>JMeter Basics</h3>
+<p>JMeter test-plans are hierarchical in structure and require a
+base set of nodes, called test-elements, to do anything useful. This set
+includes:</p>
+<ul>
+    <li>A (single) test-plan element, which is the root node</li>
+    <li>A thread-group element, a child of the test-plan element</li>
+    <li>A sampler element, a child of the thread-group element</li>
+    <li>A listener element, a child of the thread-group element</li>
+</ul>
+<h4>Test Plans</h4>
+<p>The hierarchical structure of a test plan serves to define the
+scope-of-influence of sub-ordinate test-elements. Consider the following
+test-plan configuration:</p>
+<ul>
+    <li>test-plan
+    <ul>
+        <li>thread-group
+        <ul>
+            <li>sampler-1
+            <ul>
+                <li>listener-grand-child</li>
+            </ul>
+            </li>
+            <li>sampler-2</li>
+            <li>listener-child</li>
+        </ul>
+        </li>
+        <li>listener-sibling</li>
+    </ul>
+    </li>
+</ul>
+<p>Both listener-child and listener-sibling will <i>hear</i> samples
+from both sample-1 and sampler-2. However, listener-grand-child will
+only hear samples from sampler-1.</p>
+
+<h4>Thread Groups</h4>
+<p>These provide a basis for concurrent activity in your test-plan.
+When running a simple test-plan, such as the one described above, each
+thread will basically carry-out the actions as specified by the
+thread-group's sampler descendant elements. Complex test-plans, however,
+introduce test-elements that will affect the activity of these threads;
+it is this flexibility that yields the potential to do interesting
+things with JMeter.</p>
+
+<p>Threads are typically utilised as surrogate-users, performing the
+work of the 10's, 100's, 1000's (or so however many) disparate users in
+a real i.e. production, deployment of the system. There is essentially
+two ways to utilise threads in JMeter: one thread per surrogate user,
+where the thread dies when the work for that user is done; or one thread
+per <i>n</i>-users, where <i>a thread's work is never done</i>, at least
+not until it's finished sequentially performing the work of its
+allocated users.</p>
+
+<p>You can specify as much thread-groups and as much threads (total,
+across all thread-groups) as your test infrastructure can support. A
+quick study will be carried out to see how many threads JMeter can put
+to use before system integrity is compromised.</p>
+
+<h4>Samplers</h4>
+<p>Where threads in thread-groups do the work, samplers are the work
+that gets done. They are called such as they take a sample reading
+against the system, producing a datum; the data thus collected over the
+course of a test is used to make some assertion on the system's
+functional correctness or performance.</p>
+
+<p>There are many types of samplers, but two will be mostly used
+here:</p>
+<ul>
+    <li>The HTTPRequest sampler, the HTTPClient variant, which will
+    be used to invoke the applications</li>
+    <li>The JMS Subscriber sampler, which will be used to detect
+    flight booking transactions</li>
+</ul>
+<p>Alternative tools will be used to assert the functional
+correctness of the applications: the samplers used will thus omit any
+functional information in the sample readings; only timing related data
+will be gathered. This permits orders of magnitude more samplers to be
+taken, with comparable memory usage, allowing for much longer running
+tests. <b>Longer running tests have greater potential to identify
+emergent defects caused by memory leaks.</b></p>
+
+<p>Incidentally, samplers present the best opportunity to <a href="http://en.wikipedia.org/wiki/Don't_repeat_yourself" target="_blank">DRY</a> you test-plans. For example, a workflow
+implemented in HTML forms will require a sequence of HTTP requests;
+these will only differ in the HTTP request parameters. All other details
+such as host, port, base url, even authentication details will typically
+remain the same. The JMeter mechanisms to refactor these details will be
+presented in the coming sections.</p>
+
+<h4>Listeners</h4>
+<p>Where threads and samplers gather sample data, listeners
+post-process that data, non-destructively, in varying ways. Most have a
+logging capability; some in fact only have a logging capability. More
+complex listeners do statistical analysis, the result of maybe graphed
+and/or logged.</p>
+
+<p>It is very important to note that some of the <i>statistical</i>-listeners
+need to maintain copies of the gathered samples to be able to update
+their statistically derived values; also different listeners maybe do
+this at the same time. If your intention is to carry out high-volume
+sampling, these statistical-listeners should not be used during a live
+test run. These listeners can quite easily be used <i>offline</i> to
+post-process the test results i.e. once the test has run to completion
+and all raw data has been collected.</p>
+
+<h3>Web Testing with JMeter</h3>
+<p>As mentioned, HTTPRequest samplers are used to implement tests
+that target web applications. The use of this particular sampler is most
+appropriate for invoking web-applications that have a HTML
+user-interface. It is also a good match for RESTful web-services that
+provide HTML interfaces or that produce xml data.</p>
+
+<p>RESTful web-servies and HTML-producing web-applications are of
+relevance here, less due to what they produce, but more due to the fact
+that they consume HTTP request parameters as input to their function.
+Such applications operate at the HTTP protocol level: most other
+web-services e.g. SOAP based, use HTTP only as an envelope protocol i.e.
+to exploit port-80 to traverse firewalls; they do not themselves use
+HTTP request parameters, or at least the use of such is made completely
+opaque to the user, surrogate or otherwise.</p>
+
+<p>When configuring a HTTPRequest sampler, you typically specify:</p>
+<ul>
+    <li>Server, hostname or IP address</li>
+    <li>Port, default 80</li>
+    <li>Protocol, default HTTP</li>
+    <li>Method, default GET</li>
+    <li>Encoding</li>
+    <li>Path</li>
+    <li>Request parameters</li>
+</ul>
+<p>Most of these items can be refactored.</p>
+
+<h4>Refactoring Web Tests</h4>
+<p>Imagine a third web-application for ZA.com that allows frequent
+flyer members to check their airmiles. To check one's airmiles is a
+two-step process: first navigate to the web-application's homepage; then
+input your frequent flyer membership number and password to login. After
+taking these steps, the application will display your accrued airmiles
+and a history of all your flights, along with the airmiles earned from
+each.</p>
+
+<p>This workflow specifies two HTTP requests i.e. to get to the
+login page and to subsequently login. All the details of the first
+request could potentially be identical to those of the second, barring
+the URL-path and maybe the protocol. The following pictures illustrate
+how these requests might be setup in JMeter and make clear the
+duplication of detail.</p>
+
+<table class="image" align="center">
+    <tr>
+        <td>
+        <table class="image">
+            <caption align="bottom">Figure 1: Homepage step</caption>
+            <tr>
+                <td><a onblur="try {parent.deselectBloggerImageGracefully();} catch(e) {}"
+                    href="http://3.bp.blogspot.com/_Q_F_ea5EKi0/SiFtj2NwB3I/AAAAAAAAAFM/_cNTePGUuFI/s1600-h/airmiles_navigate_to_homepage.png"><img style="margin: 0 10px 10px 0; cursor: pointer; cursor: hand; width: 400px; height: 194px;" rc="http://3.bp.blogspot.com/_Q_F_ea5EKi0/SiFtj2NwB3I/AAAAAAAAAFM/_cNTePGUuFI/s400/airmiles_navigate_to_homepage.png" border="0" alt="" id="BLOGGER_PHOTO_ID_5341671095654156146" /></a></td>
+            </tr>
+        </table>
+        </td>
+        <td>
+        <table class="image">
+            <caption align="bottom">Figure 2: Login step</caption>
+            <tr>
+                <td><a onblur="try {parent.deselectBloggerImageGracefully();} catch(e) {}" href="http://1.bp.blogspot.com/_Q_F_ea5EKi0/SiF-vdoMAcI/AAAAAAAAAFk/VZ1v4bTdzyU/s1600-h/airmiles_login.png"><img style="display: block; margin: 0px auto 10px; text-align: center; cursor: pointer; cursor: hand; width: 400px; height: 198px;" src="http://1.bp.blogspot.com/_Q_F_ea5EKi0/SiF-vdoMAcI/AAAAAAAAAFk/VZ1v4bTdzyU/s400/airmiles_login.png" border="0" alt="" id="BLOGGER_PHOTO_ID_5341689986910257602" /></a></td>
+            </tr>
+        </table>
+        </td>
+    </tr>
+</table>
+
+<p>JMeter additionally provides config-elements, one of which is the
+HTTP Request Defaults config-element. All details repeated in any of the
+samplers should be removed and placed in HTTP Request Defaults
+config-element; the usually scoping rules apply. The following figures
+illustrate this re-configuration.</p>
+
+<table class="image" align="center">
+    <tr>
+        <td colspan="2" align="center">
+        <table class="image">
+            <caption align="bottom">Figure 3: HTTP defaults</caption>
+            <tr>
+                <td><a
+                    onblur="try {parent.deselectBloggerImageGracefully();} catch(e) {}"
+                    href="http://2.bp.blogspot.com/_Q_F_ea5EKi0/SiGGtQjhtAI/AAAAAAAAAGU/x3ckAq9N7l4/s1600-h/airmiles_defaults.png"><img
+                    style="display: block; margin: 0px auto 10px; text-align: center; cursor: pointer; cursor: hand; width: 400px; height: 154px;"
+                    src="http://2.bp.blogspot.com/_Q_F_ea5EKi0/SiGGtQjhtAI/AAAAAAAAAGU/x3ckAq9N7l4/s400/airmiles_defaults.png"
+                    border="0" alt=""
+                    id="BLOGGER_PHOTO_ID_5341698745134330882" /></a></td>
+            </tr>
+        </table>
+        </td>
+    </tr>
+    <tr>
+        <td>
+        <table class="image">
+            <caption align="bottom">Figure 4: DRY Homepage
+            step</caption>
+            <tr>
+                <td><a
+                    onblur="try {parent.deselectBloggerImageGracefully();} catch(e) {}"
+                    href="http://1.bp.blogspot.com/_Q_F_ea5EKi0/SiGGtuCHUrI/AAAAAAAAAGc/MHUR-mQRlAg/s1600-h/airmiles_navigate_to_homepage_dry.png"><img
+                    style="display: block; margin: 0px auto 10px; text-align: center; cursor: pointer; cursor: hand; width: 400px; height: 181px;"
+                    src="http://1.bp.blogspot.com/_Q_F_ea5EKi0/SiGGtuCHUrI/AAAAAAAAAGc/MHUR-mQRlAg/s400/airmiles_navigate_to_homepage_dry.png"
+                    border="0" alt=""
+                    id="BLOGGER_PHOTO_ID_5341698753047253682" /></a></td>
+            </tr>
+        </table>
+        </td>
+        <td>
+        <table class="image">
+            <caption align="bottom">Figure 5: DRY Login step</caption>
+            <tr>
+                <td><a
+                    onblur="try {parent.deselectBloggerImageGracefully();} catch(e) {}"
+                    href="http://4.bp.blogspot.com/_Q_F_ea5EKi0/SiGGtqNm6fI/AAAAAAAAAGk/XPfn3SDHzws/s1600-h/airmiles_login_dry.png"><img
+                    style="display: block; margin: 0px auto 10px; text-align: center; cursor: pointer; cursor: hand; width: 400px; height: 195px;"
+                    src="http://4.bp.blogspot.com/_Q_F_ea5EKi0/SiGGtqNm6fI/AAAAAAAAAGk/XPfn3SDHzws/s400/airmiles_login_dry.png"
+                    border="0" alt=""
+                    id="BLOGGER_PHOTO_ID_5341698752021719538" /></a></td>
+            </tr>
+        </table>
+        </td>
+    </tr>
+</table>
+
+<p>Configuring DRY tests like this gives you the usual benefits
+while not incurring any readability penalty; DRY tests are much easier
+to maintain and update in the event you switch port numbers or protocols,
+etc. It might seem academic for the given example but maintaining a longer
+workflow, with 30 steps for instance, becomes much more manageable.</p>
+
+<p>It is also worth noting that JMeter test-plans i.e. the <code>.jmx</code>
+files, are formatted in XML; they are just text so you can go to work on
+them using any <i>find'n'replace</i> tool - just be careful to preserve
+the well-formedness and validness of the file.</p>
+
+<h3>Transaction Testing with JMeter</h3>
+<p></p>
+
+<h3>Parameterizing JMeter Test Plans</h3>
+<p></p>
+
+<h4>Remember:</h4>
+<p>If user-defined variables are used or if variables are injected
+from CSV files and you want to include them in sample results, you must
+amend the <em>jmeter.properties</em> file by specifying <code>sample_variables=[comma,separated,list,of,variable,names,to,include]</code>;
+search for <i>sample_variables</i> in this file and amend accordingly.</p>
+
+<h3>What's Next</h3>
+<p>Next I will go through ...; when it is ready you can read that
+blog <a href="" target="_blank">here</a>.</p>
+
+<p>Cheers</p>

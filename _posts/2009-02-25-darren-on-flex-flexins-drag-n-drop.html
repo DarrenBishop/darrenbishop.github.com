@@ -1,0 +1,53 @@
+---
+layout: post
+title: 'Darren on Flex: Flexins, Drag ''n'' Drop Mixin'
+date: '2009-02-25T11:54:00.045Z'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- Google
+- Flexmojos
+- Git
+- Maven
+modified_time: '2011-04-05T00:08:44.065+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-8808069507999126484
+blogger_orig_url: http://blog.darrenbishop.com/2009/02/darren-on-flex-flexins-drag-n-drop.html
+---
+
+<h4>I present to you the Drag'n'Drop Mixin</h4>
+I've managed to embed an instance of my Drag'n'Drop showcase app here<strike>, but I cannot seem to influence the size of it</strike>. I recommend you visit the mixin's demo page <a href="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin">here</a>
+<embed src="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin/dnd-mixin-demo-0.2.swf?attredirects=0" quality="high" bgcolor="#869ca7" width="100%" height="400" name="Main" align="middle" play="true" loop="false" quality="high" allowScriptAccess="sameDomain" type="application/x-shockwave-flash" pluginspage="http://www.adobe.com/go/getflashplayer">
+</embed>
+For those of you who are not interested in my posturing and story-telling, you can review the source for this application <a href="http://github.com/DarrenBishop/flexinsproject/blob/2683806f00055504cddb41acc6474df5652b7ccb/dnd-mixin-demo/src/main/flex/DnDMixinDemo.mxml">here</a> at GitHub.
+
+<h4>So how does it work?</h4>
+You simply include <code>&lt;dnd:DnDMixin /&gt;</code> as a child of any container type and this enables that container as a drop target and any child as a drag source. It's as simple as that.
+
+<h4>That's how you use it... How does it work?</h4>
+Ok, here's an excerpt from the project's <code>README</code> file:
+<blockquote>These mixins are designed to be used in MXML, leveraging components' event-driven life-cylce. They should be used as 'drop-ins', similar to usage model for inline item-renderers.</blockquote>
+In addition to this, I exploit the <code><a href="http://livedocs.adobe.com/flex/3/langref/mx/core/Container.html#rawChildren">Container.rawChildren</a></code> property, due to the fact that this mixin is a content-less UI component and should not interfere with content-full UI components.
+
+When an application is loaded all declared UI components are processed through an event-driven life-cycle. The life-cycle events the dnd-mixin is interested in are:<dl>
+<dt><code>FlexEvent.ADD</code>:
+<dd>Registration happens in the constructor, the earliest possible opportunity at the object level. More significantly, registration occurs before this (typically, one time) event is dispatched.
+The handler for this event deregisters from this same event, removes the dnd-mixin from the container and then adds it back but to the <code>rawChildren</code>. The handler then registers interest in the <code>DragEvent.DRAG_ENTER</code>, <code>DragEvent.DRAG_OVER</code>, <code>DragEvent.DRAG_EXIT</code> and <code>DragEvent.DRAG_DROP</code> events. The corresponding handlers implement the necessary mechanics to provide drag'n'drop functionality; I refer you to the source code as it's pretty straight forward and not that interesting, especially if you've implemented D'n'D yourself before. The handler also registers interest in the following events:
+<dt><code>ChildExistenceChangedEvent.CHILD_ADD</code>:
+<dd>Through this event the dnd-mixin is notified whenever a component is added to the parent container. The addition of a child as far as the dnd-mixin is concerned, indicates a successful drag'n'drop operation to this parent container. Thus this event signals this dnd-mixin instance to take control of the D'n'D processing for this child component (to which a reference can be obtained from the event object). This handler registers interest in the following events on each managed child component:<dl>
+<dt><code>MouseEvent.MOUSE_MOVE</code>:
+<dd>The registered handler simply detects the drag gesture (initiation) and delegates the operation to the <code>DragManager</code>.
+<dt><code>DragEvent.DRAG_COMPLETE</code>:
+<dd>The registered handler basically just adds the dragged component to the new container, which implicitly removes it from its current/previous parent. Doing so dispatches the <code>ChildExistenceChangedEvent</code>s, as explained here.
+</dl><dt><code>ChildExistenceChangedEvent.CHILD_REMOVE</code>:
+<dd>Similar to <code>CHILD_ADD</code>, this <code>CHILD_REMOVE</code> event notifies the dnd-mixin whenever a component is removed from the parent container. The removal of a child likewise indicates a successful drag'n'drop operation away from this parent container. Hence this event signals this dnd-mixin instance to relinquish control for D'n'D processing. This is explicit and is implemented through deregistering interest in the <code>MouseEvent.MOUSE_MOVE</code> and <code>DragEvent.DRAG_COMPLETE</code> events.
+</dl>
+
+And that's all there is to it. Try it out above or <a href="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin">here</a>. As you'll see there is nothing spectacular about the end result; it's functional. The benefit is the improved readability in your code gained from the clean separation, reduced duplication and declarative style the mixins adopt.
+
+While I declare this dnd-mixin is fully functional I don't presume it will suit the needs of all drag'n'drop use cases. I have also observed a bug in the rendering of dragged items that were previously clipped by the parent's right edge. I think I recall a colleague encountering this problem (and solving it) so I'll ask her about it at the next available chance.
+
+<h4>What's next?</h4>
+Drag source filtering. This will support the use case if you want to allow some types of things to be dropped, but not others. The implementation for this is actually complete (see <a href="https://sites.google.com/site/flexinsproject/flexins-catalog/dndmixin">here</a>); a blog will follow soon.
+
+If you want to use it, you know where the source/binaries are. Enjoy

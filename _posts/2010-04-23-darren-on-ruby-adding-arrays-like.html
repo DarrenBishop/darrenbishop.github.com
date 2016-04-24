@@ -1,0 +1,76 @@
+---
+layout: post
+title: 'Darren on Ruby: Adding arrays like vectors in Ruby'
+date: '2010-04-23T11:50:00.002+01:00'
+author: Darren Bishop
+tags: 
+modified_time: '2010-04-23T12:10:23.508+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-138095067523371709
+blogger_orig_url: http://blog.darrenbishop.com/2010/04/darren-on-ruby-adding-arrays-like.html
+---
+
+In the process of writing some RSpec tests, I found it useful to be able to add arrays of numbers together as you would vectors.
+
+Of course Ruby has a Vector class, but I was intrigued as to how I might implement such a thing and what extra utility I could provide; I came up with the following: 
+<pre class="brush: ruby">
+module Enumerable
+  def **(other)
+    zip(other.fill(0, other.size, size - other.size)).collect {|a| a.inject {|sum,e| sum+e}}
+  end
+  
+  def vector_add *others
+    sums = nil
+    if block_given?
+      each do |e|
+        sums = sums.nil? ? yield(e) : sums ** yield(e)
+      end
+    else
+      sums = self
+    end
+    
+    others.each do |other|
+      sums = sums.nil? ? other : sums ** other
+    end if not others.empty?
+    
+    return sums
+  end
+end
+</pre>
+
+As you can see I have overridden the <code>**</code> (exponentiation) operator; not sure this is a great idea, that is perhaps violating some 'behavioral integrity', but it can always be changed or replaced.
+
+Try running the above and following code (try pasting into IRB)...
+
+<pre class="brush: ruby">
+puts [1,2,3] ** [4,5,6]
+puts [1,2,3,4] ** [4,5,6]
+puts [1,2,3].vector_add([4,5,6])
+puts [1,2,3,4].vector_add {|e| [e*1, e*2, e*3, e*4]}
+puts [1,2,3,4].vector_add([4,5,6]) {|e| [e*1, e*2, e*3, e*4]}
+</pre>
+
+You should get something like the following:
+
+<pre class="brush: bash">
+5
+7
+9
+5
+7
+9
+4
+5
+7
+9
+10
+20
+30
+40
+14
+25
+36
+40
+</pre>
+
+
+I'm pretty pleased with that. Now, back to RSpec...

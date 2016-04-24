@@ -1,0 +1,131 @@
+---
+layout: post
+title: 'HOWTO: Configure Apache+Passenger with HTTPS/SSL'
+date: '2009-07-14T16:21:00.049+01:00'
+author: Darren Bishop
+tags:
+- Rails
+- Apache
+- mod_rails
+- Ruby
+- Passenger
+- RoR
+modified_time: '2009-07-21T11:17:25.291+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-4992435604832384068
+blogger_orig_url: http://blog.darrenbishop.com/2009/07/howto-configure-apachepassenger-with.html
+---
+
+<blockquote bgcolor="blue">The following BASH commands assume you are in a root shell. It is quite convenient to switch using <code>sudo -s</code>; this should allow for plenty cut and paste action.</blockquote>
+<pre class="brush: bash">
+apt-get update
+apt-get install -y ssh #... if like me you are working on a bare-bones VM
+</pre>
+At this point I typically close my VM Server console (cause it's pants... until screw up my network and/or ssh config). I connect using keys from Cygwin; much more productive working this way.
+<pre class="brush: bash">
+apt-get install -y build-essential wget
+</pre>
+
+<h4>Install Apache 2</h4>
+<pre class="brush: bash">
+apt-get -y install apache2 apache2-prefork-dev libreadline5-dev
+cat &gt; /etc/apache2/httpd.conf &lt;&lt;EOF
+ServerName localhost
+EOF
+</pre>
+
+<h4>Install Enterprise Ruby (<a target="_blank" href="http://www.rubyenterpriseedition.com/download.html">info</a>) &amp; Passenger</h4>
+<pre class="brush: bash">
+wget http://rubyforge.org/frs/download.php/58677/ruby-enterprise-1.8.6-20090610.tar.gz
+tar -xzvf ruby-enterprise-1.8.6-20090610.tar.gz
+./ruby-enterprise-1.8.6-20090610/installer &lt;&lt;EOF
+
+
+EOF
+/opt/ruby-enterprise-1.8.6-20090610/bin/gem install -y rails # specify version if necessary i.e. -v 2.1.0
+cat &gt; /etc/apache2/mods-available/passenger.load &lt;&lt;EOF
+LoadModule passenger_module /opt/ruby-enterprise-1.8.6-20090610/lib/ruby/gems/1.8/gems/passenger-2.2.4/ext/apache2/mod_passenger.so
+EOF
+
+cat &gt; /etc/apache2/mods-available/passenger.conf &lt;&lt;EOF
+PassengerRoot /opt/ruby-enterprise-1.8.6-20090610/lib/ruby/gems/1.8/gems/passenger-2.2.4
+PassengerRuby /opt/ruby-enterprise-1.8.6-20090610/bin/ruby
+EOF
+/opt/ruby-enterprise-1.8.6-20090610/bin/passenger-install-apache2-module &lt;&lt;EOF
+
+
+EOF
+</pre>
+
+<h4>Generate Certificate &amp; Private Key</h4>
+<pre class="brush: bash">
+mkdir -p /etc/apache2/ssl/{crt,key}
+openssl req -new -x509 -days 365 -keyout /etc/apache2/ssl/key/server.key -out /etc/apache2/ssl/crt/server.crt -nodes -subj '/O=Working With Mr.B, Ltd/OU=WWW Security Team/CN=workingwithmrb.blogspot.com'
+</pre>
+
+<h4>Enable Apache Modules</h4>
+<pre class="brush: bash">
+a2enmod rewrite
+a2enmod passenger
+a2enmod ssl
+</pre>
+
+<h4>Define &amp; Install Virtual Host Rails</h4>
+<pre class="brush: bash">
+cat &gt; /etc/apache2/sites-available/blog &lt;&lt;EOF
+&lt;VirtualHost *:80&gt;
+    ServerName workingwithmrb.blogspot.com
+    DocumentRoot /var/www_rails/blog/current/public
+    ErrorLog /var/www_rails/blog/current/log/apache.log
+
+    &lt;Location /&gt;
+        RewriteEngine on
+        RewriteCond %{HTTPS} off
+        RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [R]
+    &lt;/Location&gt;
+&lt;/VirtualHost&gt;
+
+&lt;VirtualHost *:443&gt;
+    ServerName workingwithmrb.blogspot.com
+    DocumentRoot /var/www_rails/blog/current/public
+    
+    ErrorLog /var/www_rails/blog/current/log/apache-ssl.log
+
+    SSLEngine On
+    
+    SSLProtocol -all +TLSv1 +SSLv3
+    SSLCipherSuite HIGH:MEDIUM:!aNULL:+SHA1:+MD5:+HIGH:+MEDIUM
+    
+    SSLCertificateFile /etc/apache2/ssl/crt/server.crt
+    SSLCertificateKeyFile /etc/apache2/ssl/key/server.key
+    
+    SSLVerifyClient optional
+    SSLVerifyDepth 1
+    
+    SSLOptions +StdEnvVars +StrictRequire
+    
+    CustomLog /var/log/apache2/ssl_request_log "%t %h %{SSL_PROTOCOL}x %{SSL_CIPHER}x \"%r\" %b"
+&lt;/VirtualHost&gt;
+EOF
+
+a2ensite blog
+</pre>
+
+<h4>Distinguish VirtualHosts Listening on Port 80 &amp; 443</h4>
+<pre class="brush: bash">
+sed -i 's,VirtualHost \*,VirtualHost *:80,' /etc/apache2/sites-available/default
+sed -i '/NameVirtualHost \*:80/ a NameVirtualHost *:443' /etc/apache2/sites-available/default
+</pre>
+
+<h4>Give It A Spin</h4>
+<pre class="brush: bash">
+/etc/init.d/apache2 reload
+netstat -napt
+</pre>
+
+The output from <code>netstat</code> should show Apache listening on ports 80 and 443
+
+<blockquote bgcolor="blue">Remember, if you install all this stuff as <code>root</code>, you must make sure that Apache+Passenger can access the rails application as <code>www-data</code>. Although it's a pretty stupid solution, you can achieve this by simply <code>chmod -R o+rw &lt;rails-app&gt;</code> in the parent directory. A better approach would be to create a user account e.g. called <code>rails</code> that belongs to the <code>www-data</code> group and with a umask of <code>0002</code>, then anything to do with Rails you should do logged-in as that user.</blockquote>
+
+<p>
+Hope you find this simple and useful.
+</p>

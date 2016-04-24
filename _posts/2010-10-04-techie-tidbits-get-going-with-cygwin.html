@@ -1,0 +1,42 @@
+---
+layout: post
+title: 'Techie Tidbits: Get Going with Cygwin'
+date: '2010-10-04T00:56:00.009+01:00'
+author: Darren Bishop
+tags:
+- Bash
+- Tidbits
+- Cygwin
+modified_time: '2010-10-04T01:50:09.100+01:00'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-7720934410922473030
+blogger_orig_url: http://blog.darrenbishop.com/2010/10/techie-tidbits-get-going-with-cygwin.html
+---
+
+Installing Cygwin is a pretty straight forward exercise - but here I walk-through a few extra configuration steps that make Cygwin a real productivity catalyst for my day-to-day activities.
+
+<h5>1st, Install Cygwin</h5>
+Download the <code>setup.exe</code> file from <a href="http://www.cygwin.com/setup.exe">here</a>. I usually install to <code>C:\Cygwin</code> and stick all the package stuff in <code>C:\Cygwin\.pkg</code>, where I also stick the <code>setup.exe</code>, once I've initially finished with it.
+
+<h5>2nd, relocate <code>/home</code></h5>
+Following any install or update, I always start up a shell and remove the <code>/home</code> directory and symlink to <code>C:\Documents and Settings</code> (this some how still works on Win 7, but we could easily use <code>C:\Users</code>):
+<pre class="brush: bash">
+cd /
+rm -fr home
+ln -s "C:\Documents and Settings" home
+</pre>
+This now relieves you of having to maintain two home directories - after a while of using Cygwin you'll start to wonder why they didn't do this automatically.
+
+<h5>3rd, add some <em>Bash Here</em> action</h5>
+Cygwin has a wealth of command-line tools for text processing; that's great - I find these immensely useful when tweaking configuration files or batch processing server log files, for Apache say.
+The annoying bit is getting a shell open in the directory where you need to go to work: cue <em>Chere</em>!
+<p>
+In the <em>Select Packages</em> screen, search for and install both <code>chere</code> and <code>mintty</code> packages. If you happen to be reading this through once first, you can go ahead and do this step when you first install Cygwin (in step 1).
+<p>
+Now fire up a shell and enter the following command;
+<pre class="brush: bash">
+chere -ia1 -t mintty -s bash -e 'Bash Here'
+</pre>
+Now you should be able to right click on any directory in Windows Explorer and have a <em>Bash Here</em> option
+
+<h5>4th, spin up SSHD (skip this if you're asking 'What's SSHD?')</h5>
+Errm, actually, I'll save this for another blog...

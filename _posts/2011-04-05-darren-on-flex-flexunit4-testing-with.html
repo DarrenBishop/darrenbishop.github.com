@@ -1,0 +1,28 @@
+---
+layout: post
+title: 'Darren on Flex: FlexUnit4 Testing with Parsley'
+date: '2011-04-05T23:30:00.012+01:00'
+author: Darren Bishop
+tags:
+- Flex
+- ActionScript
+- TDD
+- Agile
+- FlexUnit
+- FlashBuilder
+- Parsley
+- Flexmojos
+- DSL
+- Testing
+modified_time: '2014-11-19T16:55:47.491Z'
+blogger_id: tag:blogger.com,1999:blog-3826577489563855618.post-9111709446612954865
+blogger_orig_url: http://blog.darrenbishop.com/2011/04/darren-on-flex-flexunit4-testing-with.html
+---
+
+I've explored in the past the features of FlexUnit4, specifically its asynchronous and UI capabilities, to test the behaviour of the mixins over at my <a href="https://github.com/DarrenBishop/flexinsproject">Flexins Project</a>. Recently, however, I've been using Cairngorm and Parsley on an assignment and I've channelled my efforts into testing UI-logic. I've deferred testing views for the time being, focusing on Parsley Command objects and Cairngorm-style presentation-models (PMs) - typically objects containing logic that is triggered by the Parsley Messaging framework.  <p>I am using FlexUnit, but I recognise some might classify this testing as something other than unit-testing; calling it <i>integration-testing</i> seems a bit grand, seeing as for a Flex application, being traditionally client-server, I'm not integrating anything. I'd rather call it component-testing, looking at it from the point of view that I target the collaboration of a small subset of classes that support one functional area of the application.  <p>Still, by saying that, what I really want to acknowledge is that there maybe better tools for this kind of testing. For example I am a fan of <a href="http://en.wikipedia.org/wiki/Behavior_Driven_Development">Behaviour Driven Development</a> and have also explored using <a href="http://cukes.info/">Cucumber</a>, <a href="https://github.com/peternic/funfx/wiki">FunFX</a> and <a href="http://melomel.info/">Melomel</a>.  <p>This blog series is really just an account of what I have achieved in proving the concept of Parsley supporting FlexUnit testing.... of Cairngorm stuff.  <p>Where I am a fan of <a href="http://en.wikipedia.org/wiki/Domain-specific_language">DSLs</a>, I will also show you how an embedded DSL can be used to introduce a bit of flow to your tests and abstract away details that gradually starts to make my head spin.  <p>I re-iterate, it's all just a display of what can be done - it's by no means polished and I'm not even claiming that it's a good approach - it's simply a workable approach to shake-down your message wiring and interactions between Parsley-managed objects.  <ol><li><a href="/2011/04/darren-on-flex-flexunit4-testing-with_11.html">Unit Testing Command Objects</a></li>
+<li><a href="/2011/04/darren-on-flex-flexunit4-testing-with_17.html">Asynchronous Testing with Parsley and Fluint Sequences</a></li>
+<li><a href="/2011/04/darren-on-flex-flexunit4-testing-with_19.html">Hiding Fluint Sequences with a Flow-based DSL</a></li>
+<li><a href="/2011/04/darren-on-flex-flexunit4-testing-with_20.html">Improved Parsley Support with FlexUnit's <strike><code>[RunWith(...)]</code></strike><code>[Rule]</code></a></li>
+<li><a href="/2011/06/darren-on-flex-flexunit4-testing-with.html">Testing with a Parsley-Aware DSL</a></li>
+<li><a href="/2014/11/darren-on-flex-flexunit4-testing-with.html">Testing with Mock Injections</a></li>
+</ol>I hope you find it useful.  <h2>Update:</h2><blockquote><i>FlexUnit 4.1 has been <a href="http://www.flexunit.org/?page_id=14">released</a>, providing new features including the handy <code>[Rule]</code> hook-mechanism</i></blockquote>
